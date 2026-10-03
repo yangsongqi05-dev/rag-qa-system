@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>实验数据 - 数据库课程智能问答助手</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<div id="nav" class="navbar"></div>
+
+<div class="page">
+  <h1>检索方案对比实验</h1>
+  <p class="sub">测试集 30 条域内题（20 条术语题 + 10 条口语题），指标为 top1 命中率</p>
+
+  <h2>主实验结果</h2>
+  <table class="data">
+    <thead>
+      <tr><th>方案</th><th class="num">术语题</th><th class="num">口语题</th><th class="num">合计</th><th>对比基线</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>① 纯向量检索</td><td class="num">19/20</td><td class="num">3/10</td>
+        <td class="num">22/30 = 73%</td><td>基线</td>
+      </tr>
+      <tr>
+        <td>② BM25 关键词</td><td class="num">20/20</td><td class="num">5/10</td>
+        <td class="num">25/30 = 83%</td><td class="up">+10%</td>
+      </tr>
+      <tr>
+        <td>③ 混合检索（RRF 融合）</td><td class="num">19/20</td><td class="num">4/10</td>
+        <td class="num">23/30 = 77%</td><td class="down">−6%</td>
+      </tr>
+      <tr class="best">
+        <td>④ 向量 + rerank（两阶段）★</td><td class="num">20/20</td><td class="num">6/10</td>
+        <td class="num"><b>26/30 = 87%</b></td><td class="up">+14%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>幻觉控制指标</h2>
+  <div class="stats">
+    <div class="stat"><b>20/20</b><span>域内检索命中率 100%</span></div>
+    <div class="stat"><b>9/10</b><span>域外拒答率 90%</span></div>
+    <div class="stat"><b>93.3%</b><span>阈值分类准确率</span></div>
+    <div class="stat"><b>0.148</b><span>域内域外分档间距</span></div>
+  </div>
+
+  <h2>实验结论</h2>
+  <div class="note">
+    <b>① rerank 是唯一有效的优化</b>：命中率 73% → 87%（+14 个百分点），并且让向量检索反超了 BM25。<br><br>
+
+    <b>② 混合检索（RRF）反而下降</b>：23/30，比两个单一方案都低。原因是 RRF 平等对待两路结果，
+    而本次实验中两路强弱悬殊（BM25 83% vs 向量 73%），平等融合等于把强的那一路拖下水。
+    <b>混合检索有效的前提是两路势均力敌</b>。<br><br>
+
+    <b>③ 问题出在“排序”，不在“召回”</b>：把向量 top10 与 BM25 top10 取并集后再 rerank，
+    结果仍是 26/30，与只用向量 top10 完全相同 —— 说明 BM25 那一路没有带来新内容，
+    向量检索的候选池里已经有正确答案，只是排序不对。<br><br>
+
+    <b>④ 阈值可用但不绝对可靠</b>：域外问题 top1 分数稳定在 0.470 附近，
+    域内问题最低 0.618，中间有 0.148 的空档，阈值 0.55 可用；
+    但测试集中存在两条边界案例（域内“什么是 MVCC”仅 0.413、域外“英语四级怎么备考”达 0.555），
+    因此采用“高分直接作答 / 中分交模型判断 / 低分直接拒答”的三档策略，而非一刀切。
+  </div>
+
+  <div class="note" style="background:#EEF4F8; border-left-color:#14496B; color:#2A4A5E;">
+    <b>指标说明</b>：四种方案的分数<b>不能横向比较</b>——余弦相似度取值 0~1，BM25 分数无上限，
+    rerank 输出的是 relevance_score。量纲不同，只能比较与量纲无关的“命中率”。
+  </div>
+
+</div>
+
+<script src="/web/nav.js"></script>
+</body>
+</html>

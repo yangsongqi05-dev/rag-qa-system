@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>智能问答 - 数据库课程智能问答助手</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<div id="nav" class="navbar"></div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <h3>本次对话</h3>
+    <div id="history" class="history"></div>
+
+    <h3>知识库</h3>
+    <ul class="kb-info">
+      <li>块数：<b>377</b></li>
+      <li>语料：<b>5.6 万字</b></li>
+      <li>来源：<b>7 个文件</b></li>
+      <li>主题：<b>6 个</b></li>
+    </ul>
+
+    <h3>试试这样问</h3>
+    <div class="tip-mini">
+      · 什么是回表<br>
+      · 事务的隔离级别有哪几种<br>
+      · 一张表数据太多了怎么拆<br>
+      · 今天天气怎么样 <span class="muted">（库里没有，会拒答）</span>
+    </div>
+  </aside>
+
+  <section class="chat">
+    <div class="chat-body" id="chat">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🤖</div>
+        <h2>数据库课程助手</h2>
+        <p>知识库覆盖 索引 / 事务 / 存储引擎 / 锁 / 性能优化 等 6 个主题。<br>
+           资料里没有的，它会直接说没有，绝不编造。</p>
+      </div>
+    </div>
+
+    <div class="chat-input">
+      <div class="input-box">
+        <textarea id="q" rows="1" placeholder="问点数据库相关的问题…" onkeydown="onKey(event)"></textarea>
+        <button id="send" onclick="ask()">↑</button>
+      </div>
+      <div class="input-params">
+        <label>返回条数
+          <select id="topk">
+            <option>1</option>
+            <option selected>3</option>
+            <option>5</option>
+          </select>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="rerank" checked> 重排序
+        </label>
+        <span class="hint">关掉重排序可以对比 73% 与 87% 的效果差异</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="/web/nav.js"></script>
+<script src="/web/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>知识库 - 数据库课程智能问答助手</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<div id="nav" class="navbar"></div>
+
+<div class="page">
+  <h1>知识库概况</h1>
+  <p class="sub">语料来源、分块结果与块长分布</p>
+
+  <div class="stats">
+    <div class="stat"><b>377</b><span>入库块数</span></div>
+    <div class="stat"><b>5.6 万</b><span>净字数</span></div>
+    <div class="stat"><b>7</b><span>来源文件</span></div>
+    <div class="stat"><b>6</b><span>主题领域</span></div>
+  </div>
+
+  <h2>来源文件</h2>
+  <table class="data">
+    <thead>
+      <tr><th>文件</th><th class="num">块数</th><th class="num">净字数</th><th>覆盖主题</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>mysql_knowledge.txt</td><td class="num">262</td><td class="num">38063</td><td>SQL 语法 / 条件查询 / 排序分组 / 连接 / 子查询 / 增删改 / 建表</td></tr>
+      <tr><td>01-索引.txt</td><td class="num">32</td><td class="num">4879</td><td>B+ 树 / 聚簇索引 / 回表 / 覆盖索引 / 最左前缀 / 索引失效 / EXPLAIN</td></tr>
+      <tr><td>02-事务.txt</td><td class="num">20</td><td class="num">2690</td><td>ACID / 隔离级别 / 脏读幻读 / MVCC / Read View</td></tr>
+      <tr><td>03-存储引擎.txt</td><td class="num">19</td><td class="num">2588</td><td>InnoDB 与 MyISAM / Buffer Pool / redo log / undo log / binlog</td></tr>
+      <tr><td>04-锁.txt</td><td class="num">18</td><td class="num">2368</td><td>全局锁 / 表锁 / 行锁 / 间隙锁 / 临键锁 / 死锁</td></tr>
+      <tr><td>05-性能优化.txt</td><td class="num">17</td><td class="num">2549</td><td>慢查询日志 / EXPLAIN 分析 / 分页优化 / 表结构 / 分库分表</td></tr>
+      <tr><td>06-其他.txt</td><td class="num">17</td><td class="num">2526</td><td>视图 / 存储过程 / 触发器 / 权限 / 备份恢复 / 字符集</td></tr>
+    </tbody>
+  </table>
+
+  <h2>块长分布</h2>
+  <div class="bar-row"><div class="bar-label">少于 80 字</div><div class="bar-track"><div class="bar-fill" style="width:7%"></div></div><div class="bar-num">22 块</div></div>
+  <div class="bar-row"><div class="bar-label">80 ~ 140 字</div><div class="bar-track"><div class="bar-fill" style="width:9%"></div></div><div class="bar-num">25 块</div></div>
+  <div class="bar-row"><div class="bar-label">140 ~ 200 字</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="bar-num">283 块</div></div>
+  <div class="bar-row"><div class="bar-label">200 ~ 260 字</div><div class="bar-track"><div class="bar-fill" style="width:19%"></div></div><div class="bar-num">53 块</div></div>
+  <div class="bar-row"><div class="bar-label">超过 260 字</div><div class="bar-track"><div class="bar-fill" style="width:2%"></div></div><div class="bar-num">2 块</div></div>
+
+  <div class="note">
+    <b>分块策略</b>：按<b>空行</b>切分，保证每块是一个完整知识点；随后把长度不足 45 字的碎块并入相邻块。<br>
+    切分共产生 <b>385 块</b>，其中 8 块因过短被合并，最终入库 <b>377 块</b>。<br>
+    块长中位数 <b>168 字</b>、平均 <b>165 字</b>，全部落在 29 ~ 267 字之间。
+  </div>
+</div>
+
+<script src="/web/nav.js"></script>
+</body>
+</html>

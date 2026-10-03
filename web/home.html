@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>首页 - 数据库课程智能问答助手</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<div id="nav" class="navbar"></div>
+
+<div class="page">
+  <h1>系统概况</h1>
+  <p class="sub">基于 RAG（检索增强生成）与两阶段检索的数据库课程智能问答系统</p>
+
+  <div class="stats">
+    <div class="stat"><b>377</b><span>知识库块数</span></div>
+    <div class="stat"><b>5.6 万</b><span>语料净字数</span></div>
+    <div class="stat"><b>87%</b><span>检索命中率</span></div>
+    <div class="stat"><b>40</b><span>测试集题数</span></div>
+  </div>
+
+  <h2>功能导航</h2>
+  <div class="cards">
+    <a class="fcard" href="/">
+      <h3>💬 智能问答</h3>
+      <p>输入问题，系统检索知识库后由大模型作答，并给出引用出处。资料里没有的直接拒答，绝不编造。</p>
+    </a>
+    <a class="fcard" href="/web/kb.html">
+      <h3>📚 知识库概况</h3>
+      <p>7 个来源文件、377 个文本块、块长分布与主题覆盖情况。</p>
+    </a>
+    <a class="fcard" href="/web/eval.html">
+      <h3>📊 实验数据</h3>
+      <p>四种检索方案的对比实验结果，以及幻觉控制的三项评测指标。</p>
+    </a>
+    <a class="fcard" href="/web/about.html">
+      <h3>🏗 系统说明</h3>
+      <p>五层架构、技术栈、数据流向，以及四个关键设计决策及其依据。</p>
+    </a>
+  </div>
+
+  <div class="note">
+    <b>一句话原理</b>：把课程资料切成小块、转成向量存起来；学生提问时，先检索出最相关的几段原文，
+    再连同问题一起交给大模型，并要求它<b>只照着原文回答</b>——原文里没有的，就明说没有。
+  </div>
+</div>
+
+<script src="/web/nav.js"></script>
+</body>
+</html>

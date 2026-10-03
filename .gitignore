@@ -1,0 +1,22 @@
+# 向量库（本地生成的大文件，跑 build_index.py 就能重建）
+data/vector.json
+data/vectors.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# PyCharm / IDEA
+.idea/
+*.iml
+
+# 密钥文件（切勿提交）
+api_key.txt
+*_key.txt
+
+# 系统
+.DS_Store
+Thumbs.db

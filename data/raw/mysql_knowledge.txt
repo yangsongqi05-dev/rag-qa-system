@@ -1,0 +1,2434 @@
+========== MySQL 复习手册 ==========
+MySQL 复习手册
+只保留你学过的、真正有用的部分 ｜ 附例题与答案
+姓名  杨淞淇
+依据  你自己的 7 个练习文件（day1 到 day3.2）
+用法  先背「四个心法」，再背「八大模板」，最后做「自测题」
+原则  面试和工作中用不到的，这份手册里没有
+
+零、怎么用这份手册
+●  1　不要从头读到尾。 先看第一节「四个心法」，那是理解一切的地基
+●  2　写 SQL 卡住时，翻第二节「九大模板」，照着骨架套
+●  3　第三节是你的错题本，考前必看
+●  4　第四节 24 道自测题，答案在文末。遮住答案自己写，写完再对
+●  5　第五节是面试会问的，提前想好怎么答
+
+一、四个心法（背下来，比记语法有用得多）
+心法 1：SQL 的书写顺序和执行顺序不一样
+SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+1. FROM        先确定从哪张表查
+2. WHERE       过滤行（分组之前）
+3. GROUP BY    分组
+
+4. HAVING      过滤分组（分组之后）
+5. SELECT      选出要显示的列
+6. ORDER BY    排序
+7. LIMIT       限制条数
+提示  理解这个顺序，你就明白为什么 WHERE 里不能写聚合函数了 —— 因为 WHERE 执行的时候，还没分组，COUNT、AVG 这些根本还没算出来。
+
+心法 2：WHERE 和 HAVING 的区别
+对比项
+WHERE
+HAVING
+作用对象
+过滤「行」
+过滤「分组结果」
+执行时机
+分组之前
+分组之后
+能不能写聚合函数
+不能
+能
+能不能单独用
+能
+不能，必须配 GROUP BY
+-- WHERE：先筛人，再统计
+SELECT department_id, AVG(salary)
+FROM employees
+
+WHERE salary > 5000          -- 先把工资低于 5000 的人去掉
+GROUP BY department_id;
+-- HAVING：先统计，再筛结果
+SELECT department_id, AVG(salary)
+FROM employees
+GROUP BY department_id
+
+HAVING AVG(salary) > 10000;  -- 算出平均工资后再筛
+提示  一句话记法：「分组前用 WHERE，分组后用 HAVING；聚合函数只能放 HAVING」。
+心法 3：三种连接的区别
+类型
+结果是什么
+什么时候用
+INNER JOIN
+两边都匹配得上的记录
+最常见的普通查询
+LEFT JOIN
+
+左表全部保留，右表没匹配的显示 NULL
+查「左表里有哪些在右表里没有」
+自连接
+同一张表连自己
+查「员工和他的上级」这种同表内有层级关系的
+-- 查「哪个部门没有员工」：左表保留全部，右表为 NULL 的就是没有的
+SELECT d.department_name
+FROM departments AS d
+LEFT JOIN employees AS e ON d.department_id = e.department_id
+
+WHERE e.employee_id IS NULL;
+提示  「没有 XX 的 YY」这类题，一律用左外连接 + 右表主键 IS NULL。 这是固定套路，背下来。
+心法 4：什么时候用子查询
+位置
+用途
+例子场景
+WHERE 后面
+最常用。拿子查询的结果做比较
+「谁的工资比 Abel 高」
+FROM 后面
+把子查询结果当一张临时表，再连其他表
+
+「每个部门的平均工资属于哪个等级」
+SELECT 后面
+只能返回单个值，作为一列显示
+「每个部门有几个员工」
+EXISTS 后面
+相关子查询，判断「存在不存在」
+「查询有员工的部门名」
+提示  判断能不能用子查询，问自己一句：「我是不是要先算出一个数/一张表，再去查？」 是就用。
+二、九大模板（写 SQL 时照着套）
+
+模板 1：基础查询
+SELECT 字段1, 字段2, 字段3
+FROM 表名;
+-- 别名
+SELECT last_name AS 姓, salary AS 工资 FROM employees;
+-- 去重
+SELECT DISTINCT department_id FROM employees;
+-- 拼接
+SELECT CONCAT(last_name, '_', first_name) AS 姓名 FROM employees;
+
+▪  例题：查询所有员工的姓名和年薪（年薪 = 月薪 × 12 × (1 + 奖金率)，没有奖金的按 0 算）
+SELECT last_name, salary * 12 * (1 + IFNULL(commission_pct, 0)) AS 年薪
+FROM employees;
+提示  没有奖金的人 `commission_pct` 是 NULL，NULL 参与运算结果还是 NULL。所以必须用 `IFNULL(字段, 0)` 换成 0。这是必考点。
+
+模板 2：条件查询
+SELECT 字段
+FROM 表名
+WHERE 条件;
+写法
+作用
+例子
+= > < >= <=
+比较
+salary >= 12000
+!= 或 <>
+不等于
+department_id != 90
+AND / OR
+多条件
+salary > 10000 AND department_id = 90
+BETWEEN 值1 AND 值2
+
+范围（含两端）
+salary BETWEEN 10000 AND 20000
+IN (值1, 值2)
+在列表里
+job_id IN ('IT_PROG', 'AD_VP')
+LIKE
+模糊匹配
+last_name LIKE '%a%'
+IS NULL / IS NOT NULL
+空值判断
+commission_pct IS NULL
+
+`<=>`
+安全等于，能判断 NULL
+commission_pct <=> NULL
+▪  LIKE 的通配符：`%` 代表任意多个字符，`_` 代表任意一个字符，`\` 是转义符
+-- 名字第二个字符是 o
+WHERE last_name LIKE '_o%';
+-- 名字里真的含下划线（下划线被转义了）
+WHERE last_name LIKE '%\_%';
+
+▪  例题 1：查询工资大于 12000 的员工的姓名和工资
+SELECT last_name, salary FROM employees WHERE salary > 12000;
+▪  例题 2：查询没有奖金的员工姓名（两种写法）
+SELECT last_name FROM employees WHERE commission_pct IS NULL;
+
+SELECT last_name FROM employees WHERE commission_pct <=> NULL;
+提示  `IS NULL` 和 `= NULL` 不一样！`= NULL` 永远查不出东西，这是新手必踩的坑。
+
+模板 3：排序
+SELECT 字段
+FROM 表名
+WHERE 条件
+ORDER BY 字段1 ASC|DESC, 字段2 ASC|DESC;
+▪  ASC 是升序（默认，可省略），DESC 是降序
+▪  多个字段排序：先按第一个字段排，第一个字段相同的再按第二个排
+▪  ORDER BY 后面可以写：字段名、别名、表达式、函数
+
+▪  例题：按工资降序显示员工姓名和工资，工资相同的按入职时间升序
+SELECT last_name, salary, hiredate
+FROM employees
+ORDER BY salary DESC, hiredate ASC;
+
+模板 4：分组统计（最常考，重点背）
+SELECT 分组字段, 聚合函数(字段)
+FROM 表名
+WHERE 分组前的条件
+GROUP BY 分组字段
+HAVING 分组后的条件
+ORDER BY 排序字段
+LIMIT 条数;
+函数
+作用
+备注
+COUNT(*)
+统计行数
+最常用
+SUM(字段)
+求和
+只对数值型有效
+AVG(字段)
+
+求平均
+只对数值型有效
+MAX(字段)
+最大值
+任何类型都行
+MIN(字段)
+最小值
+任何类型都行
+提示  聚合函数全部忽略 NULL。 所以 `COUNT(*)` 和 `COUNT(字段)` 结果可能不一样 —— 后者不统计 NULL 行。这个细节面试爱问。
+▪  例题 1：查询每个工种的最高工资
+SELECT job_id, MAX(salary) AS 最高工资
+
+FROM employees
+GROUP BY job_id;
+▪  例题 2：查询每个部门的平均工资，只显示平均工资大于 10000 的部门
+SELECT department_id, AVG(salary) AS 平均工资
+FROM employees
+GROUP BY department_id
+HAVING AVG(salary) > 10000;
+
+▪  例题 3：查询有奖金的员工中，每个部门的最高工资，只显示最高工资大于 12000 的，按最高工资降序
+SELECT department_id, MAX(salary) AS 最高工资
+FROM employees
+WHERE commission_pct IS NOT NULL
+GROUP BY department_id
+
+HAVING MAX(salary) > 12000
+ORDER BY 最高工资 DESC;
+提示  这道题同时用了 WHERE、GROUP BY、HAVING、ORDER BY，是最典型的「全套」写法。能把这道题默写出来，分组查询就过关了。
+
+模板 5：连接查询
+-- 内连接：两边都匹配得上
+SELECT 字段
+FROM 表1 AS 别名1
+INNER JOIN 表2 AS 别名2 ON 别名1.字段 = 别名2.字段
+WHERE 条件
+GROUP BY ...
+ORDER BY ...;
+-- 左外连接：左表全要
+SELECT 字段
+FROM 表1 AS 别名1
+
+LEFT JOIN 表2 AS 别名2 ON 别名1.字段 = 别名2.字段
+WHERE 别名2.主键 IS NULL;    -- 这一行是查「没有匹配」的关键
+▪  连接条件用 `ON`，过滤条件用 `WHERE`，两个不要混
+▪  三张表就再写一个 `INNER JOIN`，往下接
+▪  例题 1：查询员工姓名和对应的部门名
+
+SELECT e.last_name, d.department_name
+FROM employees AS e
+INNER JOIN departments AS d ON e.department_id = d.department_id;
+▪  例题 2：查询每个城市的部门个数
+SELECT l.city, COUNT(*) AS 部门个数
+
+FROM departments AS d
+INNER JOIN locations AS l ON d.location_id = l.location_id
+GROUP BY l.city;
+▪  例题 3：查询员工姓名和他上级的姓名（自连接）
+SELECT e.last_name AS 员工, m.last_name AS 上级
+
+FROM employees AS e
+INNER JOIN employees AS m ON e.manager_id = m.employee_id;
+▪  例题 4：查询哪个部门没有员工
+SELECT d.department_name
+FROM departments AS d
+LEFT JOIN employees AS e ON d.department_id = e.department_id
+
+WHERE e.employee_id IS NULL;
+提示  自连接的关键：同一张表起两个不同的别名，当成两张表用。上面例题 3 里，`e` 是员工，`m` 是上级。
+
+模板 6：子查询
+-- 位置一：WHERE 后面（最常用）
+SELECT 字段 FROM 表 WHERE 字段 = (SELECT ...);
+-- 位置二：FROM 后面（当临时表）
+SELECT * FROM (SELECT ...) AS 别名 WHERE ...;
+-- 位置三：SELECT 后面（只能出单个值）
+
+SELECT 字段, (SELECT ...) AS 新列 FROM 表;
+-- 位置四：EXISTS 后面（相关子查询）
+SELECT 字段 FROM 表1 WHERE EXISTS (SELECT * FROM 表2 WHERE 表2.字段 = 表1.字段);
+▪  例题 1：查询工资比 Abel 高的员工
+
+SELECT last_name, salary
+FROM employees
+WHERE salary > (SELECT salary FROM employees WHERE last_name = 'Abel');
+▪  例题 2：查询工资高于本部门平均工资的员工（相关子查询）
+SELECT last_name, salary, department_id
+
+FROM employees AS e
+WHERE salary > (
+SELECT AVG(salary) FROM employees WHERE department_id = e.department_id
+);
+▪  例题 3：查询每个部门工资最高的员工姓名和工资（这道是重点题）
+-- 写法一：相关子查询
+
+SELECT last_name, salary, department_id
+FROM employees AS e
+WHERE salary = (
+SELECT MAX(salary) FROM employees WHERE department_id = e.department_id
+);
+-- 写法二：派生表 + 连回去
+
+SELECT e.last_name, e.salary, e.department_id, e.department_id
+FROM employees AS e
+INNER JOIN (
+SELECT department_id, MAX(salary) AS max_sal
+FROM employees
+
+GROUP BY department_id
+) AS t
+ON e.department_id = t.department_id AND e.salary = t.max_sal;
+提示  「相关子查询」的特征：子查询里用到了外层的字段（上面 `e.department_id`）。子查询会对外层的每一行各执行一次。
+
+模板 7：分页与联合查询
+-- 分页：从第 offset 条开始，取 size 条（offset 从 0 开始数）
+SELECT * FROM 表 LIMIT offset, size;
+-- 每页 size 条，取第 n 页：
+-- LIMIT (n-1) * size, size
+-- 联合查询：把多条查询结果上下拼起来
+
+SELECT ... FROM 表1 WHERE ...
+UNION
+SELECT ... FROM 表2 WHERE ...;
+▪  UNION 要求两条语句的列数一致、类型顺序一致
+▪  UNION 会自动去重，UNION ALL 不去重（更快）
+▪  例题：每页显示 10 条，查询第 3 页
+SELECT * FROM employees LIMIT 20, 10;   -- 跳过前 20 条，取 10 条
+
+模板 8：增删改（DML）
+-- 增：指定列（推荐）
+INSERT INTO 表名(列1, 列2) VALUES(值1, 值2);
+INSERT INTO 表名(列1, 列2) VALUES(值1, 值2), (值3, 值4);   -- 批量
+-- 增：把查询结果插进去（建表时常用）
+INSERT INTO 表名(列1, 列2) SELECT 列1, 列2 FROM 另一张表;
+
+-- 改
+UPDATE 表名 SET 列1 = 值1, 列2 = 值2 WHERE 条件;
+-- 删
+DELETE FROM 表名 WHERE 条件;
+TRUNCATE TABLE 表名;          -- 清空整表
+提示  两条铁律： ① UPDATE 和 DELETE 忘写 WHERE 会改/删全表。② 先 SELECT 确认范围，再改成 UPDATE 或 DELETE。
+
+▪  DELETE 和 TRUNCATE 的区别（面试会问）
+DELETE
+TRUNCATE
+能不能带 WHERE
+能
+不能
+自增列
+删除后再插入，接着断点往下走
+删除后再插入，从 1 重新开始
+效率
+低
+高
+
+模板 9：建表与改表（DDL）
+-- 建库
+CREATE DATABASE IF NOT EXISTS 库名;
+DROP DATABASE IF EXISTS 库名;
+-- 建表（带约束，实际工作必须这么写）
+CREATE TABLE 表名(
+id         INT PRIMARY KEY AUTO_INCREMENT,     -- 主键 + 自增
+
+name       VARCHAR(20) NOT NULL,               -- 非空
+age        INT DEFAULT 0,                      -- 默认值
+phone      VARCHAR(11) UNIQUE,                 -- 唯一
+
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- 默认当前时间
+);
+-- 改表
+ALTER TABLE 表名 ADD COLUMN 新列 类型;                 -- 加列
+ALTER TABLE 表名 MODIFY COLUMN 列名 新类型;            -- 改类型
+
+ALTER TABLE 表名 CHANGE COLUMN 旧名 新名 类型;         -- 改列名
+ALTER TABLE 表名 DROP COLUMN 列名;                     -- 删列
+ALTER TABLE 表名 RENAME TO 新表名;                     -- 改表名
+
+-- 删表
+DROP TABLE IF EXISTS 表名;
+▪  常用数据类型：INT（整数）、VARCHAR(n)（变长字符串）、TEXT（长文本）、DECIMAL(m,n)（精确小数，钱用它）、DATETIME（日期时间）
+▪  表的复制三招
+CREATE TABLE 新表 LIKE 旧表;                     -- 只复制结构
+
+CREATE TABLE 新表 SELECT * FROM 旧表;              -- 结构 + 全部数据
+CREATE TABLE 新表 SELECT id, name FROM 旧表
+WHERE 条件;                                      -- 结构 + 部分数据
+
+三、错题本：你在自己练习里写错的 6 个地方
+错误 1：全角分号
+SELECT 100 % 98 AS 结果；      ← 结尾是全角「；」，MySQL 不认
+SELECT 100 % 98 AS 结果;       ← 必须是半角「;」
+提示  中文输入法下打标点最容易出这个错。写 SQL 时把输入法切到英文。
+
+错误 2：SELECT 后面多一个逗号
+SELECT last_name, FROM employees WHERE ...    ← 错
+SELECT last_name FROM employees WHERE ...      ← 对
+错误 3：字段名拼错
+WHERE m.employee_id = e.employees_id     ← 错，表里没有 employees_id 这个字段
+
+WHERE m.employee_id = e.employee_id      ← 对
+错误 4：用反引号包字符串
+WHERE bo.`boyName` = `张无忌`     ← 错，反引号是包「字段名」的
+WHERE bo.`boyName` = '张无忌'      ← 对，字符串用单引号
+提示  这是最要紧的一个，面试里会被抓。记住：反引号包字段名和表名，单引号包字符串和日期。
+
+错误 5：CROSS JOIN 的写法
+FROM beauty.b, CROSS join boys.bo;     ← 错
+FROM beauty b CROSS JOIN boys bo;      ← 对
+错误 6：建表不带约束
+-- 课程示例的写法（学习用可以，实际工作不行）
+CREATE TABLE book(id INT, bname VARCHAR(20), price DOUBLE);
+
+-- 自己建表要这么写
+CREATE TABLE book(
+id    INT PRIMARY KEY AUTO_INCREMENT,
+bname VARCHAR(20) NOT NULL,
+price DECIMAL(10,2) DEFAULT 0
+);
+提示  没有主键的表，数据没办法定位，也没办法和别人关联。建表第一件事就是定主键。
+
+四、自测 24 题（先自己写，答案在文末）
+基础与条件（第 1 到 6 题）
+●  1　查询工资大于 12000 的员工姓名和工资
+●  2　查询部门编号是 90 或 100 的员工姓名、部门编号
+●  3　查询姓名中包含字母 a 的员工姓名
+●  4　查询没有奖金的员工姓名和奖金率
+●  5　查询工资在 10000 到 20000 之间的员工姓名和工资（用 BETWEEN 写一遍，再用 AND 写一遍）
+
+●  6　查询工种编号是 IT_PROG 或 AD_VP 的员工姓名和工种编号
+排序与分组（第 7 到 12 题）
+●  7　按工资降序显示员工姓名、工资、入职时间，工资相同的按入职时间升序
+●  8　查询每个工种的最高工资
+●  9　查询每个部门的平均工资，只显示平均工资大于 10000 的部门
+●  10　查询每个部门的员工个数，只显示员工个数大于 5 的部门，按人数降序
+
+●  11　查询每个部门的平均工资，按平均工资从高到低排序，只取前 3 个
+●  12　查询有奖金的员工中，每个部门的最高工资，只显示最高工资大于 12000 的
+连接查询（第 13 到 17 题）
+●  13　查询员工姓名和对应的部门名
+●  14　查询每个城市的部门个数
+●  15　查询每个工种的工种名和员工个数，按员工个数降序
+
+●  16　查询每个员工的姓名和他的工资等级（用 job_grades 表，非等值连接）
+●  17　查询哪个部门没有员工
+子查询（第 18 到 21 题）
+●  18　查询工资比 Abel 高的员工姓名和工资
+●  19　查询工资高于本部门平均工资的员工姓名、工资、部门编号
+●  20　查询每个部门工资最高的员工姓名和工资
+
+●  21　查询每个部门的平均工资，以及这个平均工资属于哪个工资等级
+分页与增删改（第 22 到 24 题）
+●  22　每页显示 10 条，查询第 3 页
+●  23　往 beauty 表插入一条数据（自己编内容）
+●  24　把 beauty 表中姓「罗」的人的电话改成 13800000000
+
+五、面试会问的 8 个问题
+●  1　WHERE 和 HAVING 有什么区别？ 答：WHERE 在分组前过滤行，HAVING 在分组后过滤分组结果；WHERE 里不能写聚合函数。
+●  2　COUNT(*) 和 COUNT(字段) 有什么区别？ 答：COUNT(*) 统计所有行；COUNT(字段) 不统计该字段为 NULL 的行，所以结果可能更小。
+
+●  3　INNER JOIN 和 LEFT JOIN 有什么区别？ 答：内连接只返回两边都匹配的记录；左连接保留左表全部记录，右表没匹配的字段显示 NULL。查「没有 XX 的 YY」用左连接加 IS NULL。
+●  4　DELETE、TRUNCATE、DROP 有什么区别？ 答：DELETE 按条件删数据，可以带 WHERE，自增值接着走；TRUNCATE 清空整表，不能带 WHERE，自增值重置为 1，效率更高；DROP 是把整张表结构一起删掉。
+
+●  5　子查询和连接查询有什么区别？哪个性能更好？ 答：子查询可读性好，适合「先算一个结果再拿它去查」；连接查询通常性能更好，尤其是有索引的时候。实际开发里能用连接就用连接。
+●  6　什么是相关子查询？ 答：子查询里引用了外层查询的字段，外层每一行都会执行一次子查询，所以性能较差。
+●  7　UNION 和 UNION ALL 有什么区别？ 答：UNION 会去重，UNION ALL 不去重但更快。知道不会重复时用 UNION ALL。
+
+●  8　没有索引的话，查询会怎么样？ 答：会全表扫描，数据量大时非常慢。索引相当于书的目录。（这部分现在不用深入，面试前一周再补）
+
+六、24 题答案
+基础与条件
+-- 1
+SELECT last_name, salary FROM employees WHERE salary > 12000;
+-- 2
+SELECT last_name, department_id FROM employees WHERE department_id IN (90, 100);
+
+-- 3
+SELECT last_name FROM employees WHERE last_name LIKE '%a%';
+-- 4
+SELECT last_name, commission_pct FROM employees WHERE commission_pct IS NULL;
+-- 5
+SELECT last_name, salary FROM employees WHERE salary BETWEEN 10000 AND 20000;
+
+SELECT last_name, salary FROM employees WHERE salary >= 10000 AND salary <= 20000;
+-- 6
+SELECT last_name, job_id FROM employees WHERE job_id IN ('IT_PROG', 'AD_VP');
+
+排序与分组
+-- 7
+SELECT last_name, salary, hiredate FROM employees ORDER BY salary DESC, hiredate ASC;
+-- 8
+SELECT job_id, MAX(salary) FROM employees GROUP BY job_id;
+
+-- 9
+SELECT department_id, AVG(salary) FROM employees
+GROUP BY department_id HAVING AVG(salary) > 10000;
+-- 10
+SELECT department_id, COUNT(*) AS 人数 FROM employees
+
+GROUP BY department_id HAVING COUNT(*) > 5 ORDER BY 人数 DESC;
+-- 11
+SELECT department_id, AVG(salary) AS 平均工资 FROM employees
+GROUP BY department_id ORDER BY 平均工资 DESC LIMIT 3;
+
+-- 12
+SELECT department_id, MAX(salary) FROM employees
+WHERE commission_pct IS NOT NULL
+GROUP BY department_id HAVING MAX(salary) > 12000;
+连接查询
+-- 13
+SELECT e.last_name, d.department_name
+
+FROM employees e INNER JOIN departments d ON e.department_id = d.department_id;
+-- 14
+SELECT l.city, COUNT(*) FROM departments d
+INNER JOIN locations l ON d.location_id = l.location_id GROUP BY l.city;
+
+-- 15
+SELECT j.job_title, COUNT(*) FROM employees e
+INNER JOIN jobs j ON e.job_id = j.job_id GROUP BY j.job_title ORDER BY COUNT(*) DESC;
+-- 16
+SELECT e.last_name, g.grade_level
+
+FROM employees e JOIN job_grades g
+ON e.salary BETWEEN g.lowest_sal AND g.highest_sal;
+-- 17
+SELECT d.department_name FROM departments d
+LEFT JOIN employees e ON d.department_id = e.department_id
+
+WHERE e.employee_id IS NULL;
+子查询
+-- 18
+SELECT last_name, salary FROM employees
+WHERE salary > (SELECT salary FROM employees WHERE last_name = 'Abel');
+-- 19
+
+SELECT last_name, salary, department_id FROM employees e
+WHERE salary > (SELECT AVG(salary) FROM employees WHERE department_id = e.department_id);
+-- 20（两种写法都算对）
+
+SELECT last_name, salary, department_id FROM employees e
+WHERE salary = (SELECT MAX(salary) FROM employees WHERE department_id = e.department_id);
+SELECT e.last_name, e.salary, e.department_id
+
+FROM employees e
+INNER JOIN (SELECT department_id, MAX(salary) AS max_sal
+FROM employees GROUP BY department_id) t
+ON e.department_id = t.department_id AND e.salary = t.max_sal;
+
+-- 21
+SELECT t.department_id, t.avg_sal, g.grade_level
+FROM (SELECT department_id, AVG(salary) AS avg_sal FROM employees
+GROUP BY department_id) t
+INNER JOIN job_grades g ON t.avg_sal BETWEEN g.lowest_sal AND g.highest_sal;
+
+分页与增删改
+-- 22
+SELECT * FROM employees LIMIT 20, 10;
+-- 23（内容自编，列名必须和表结构对应）
+INSERT INTO beauty(id, name, sex, borndate, phone, boyfriend_id)
+VALUES(25, '测试数据', '女', '2000-01-01', '13800000000', 1);
+
+-- 24
+UPDATE beauty SET phone = '13800000000' WHERE name LIKE '%罗%';
+提示  第 20 题是这套题的压轴。如果你能用两种写法都写出来，MySQL 这块就真的过关了。
+
+========== MySQL 知识点总结 ==========
+MySQL 知识点总结
+基础查询 → 条件查询 → 排序查询 → 常见函数（047 课之前）
+提示  用法：复习时对着看。带「易错」标记的是高频出错点，带「面试」的是常考题。
+
+一、基础查询
+基本语法
+SELECT 查询列表 FROM 表名;
+查询列表可以是
+类型
+例子
+字段
+SELECT last_name FROM employees;
+常量
+SELECT 100; 或 SELECT 'john';
+表达式
+SELECT 100 * 98;
+函数
+SELECT VERSION();
+提示  查询的结果是一个虚拟的表格，不真正存储。
+
+起别名（AS 或 空格）
+-- 方式一：用 AS
+SELECT last_name AS 姓, first_name AS 名 FROM employees;
+-- 方式二：用空格（可省略 AS）
+SELECT last_name 姓, first_name 名 FROM employees;
+▪  为什么要起别名：① 便于理解 ② 字段重名时可以区分
+
+▪  易错：别名如果含空格或特殊字符，要用双引号包起来，如 AS "out put"
+去重（DISTINCT）
+SELECT DISTINCT department_id FROM employees;
+▪  DISTINCT 只能放在所有字段的最前面，后面跟一个字段
+▪  易错：SELECT department_id, DISTINCT job_id 是错的
+
+二、+ 号的作用（重要）
+MySQL 里 + 号只做运算，不做拼接
+情况
+结果
+两个数字相加
+SELECT 100+1; → 101
+数字 + 字符（能转数字）
+SELECT 100+'1'; → 101
+数字 + 字符（不能转）
+SELECT 100+'abc'; → 100（字符当 0）
+任一方为 NULL
+结果为 NULL
+
+提示  面试常问：MySQL 里怎么拼接字符串？答案是 CONCAT()，不是 + 号。
+拼接字符串用 CONCAT
+SELECT CONCAT(1, 2, 3);                      -- 结果 123
+SELECT CONCAT(last_name, '_', first_name) AS 姓名
+
+FROM employees;
+▪  易错：CONCAT 里只要有一个参数是 NULL，整个结果就是 NULL
+▪  解决办法：用 IFNULL(字段, 替代值) 包一层
+SELECT CONCAT(last_name, '_', IFNULL(commission_pct, 0)) FROM employees;
+
+三、条件查询
+语法
+SELECT 查询列表 FROM 表名 WHERE 筛选条件;
+① 条件表达式
+SELECT * FROM employees WHERE salary > 12000;
+SELECT last_name, department_id FROM employees
+WHERE department_id != 90;         -- != 等价于 <>
+
+② 逻辑表达式（AND / OR / NOT）
+SELECT last_name, salary, commission_pct
+FROM employees
+WHERE salary >= 10000 AND salary <= 20000;
+SELECT * FROM employees
+WHERE department_id < 90 OR department_id > 110 OR salary > 15000;
+
+▪  易错：AND 的优先级高于 OR，混用时一定加括号
+-- 想要的是：部门 90 且工资 >20000，或者部门 80
+-- 错误写法（实际含义不同）
+WHERE department_id = 90 OR department_id = 80 AND salary > 20000
+-- 正确写法
+WHERE department_id = 90 OR (department_id = 80 AND salary > 20000)
+
+③ 模糊查询 LIKE
+SELECT * FROM employees WHERE last_name LIKE '%a%';
+通配符
+含义
+%
+任意多个字符（包括 0 个）
+_
+任意单个字符
+-- 名字第三个字符是 n，第五个是 l
+SELECT last_name, salary FROM employees
+WHERE last_name LIKE '__n_l%';
+
+转义字符
+-- 正常匹配：名字第二个字符是 _
+SELECT last_name FROM employees
+WHERE last_name LIKE '__\_%';
+▪  易错：要查 "_" 本身，必须用反斜杠转义成 \_，否则 _ 会被当成通配符
+④ BETWEEN AND
+SELECT * FROM employees
+
+WHERE employee_id BETWEEN 100 AND 120;
+▪  注意：包含两个端点（100 和 120 都算）
+▪  两个值不能颠倒，BETWEEN 100 AND 120 不能写成 120 AND 100
+⑤ IN
+SELECT last_name, job_id FROM employees
+
+WHERE job_id IN ('IT_PROT', 'AD_VP');
+▪  等价于 job_id = 'IT_PROT' OR job_id = 'AD_VP'
+▪  IN 列表里不支持通配符，写 '%IT%' 没用，那种情况要用 LIKE
+⑥ IS NULL / IS NOT NULL
+SELECT last_name, commission_pct FROM employees
+
+WHERE commission_pct IS NULL;
+▪  易错：不能写 = NULL，因为 NULL 不等于任何值（包括它自己）
+▪  判断空值只能用 IS NULL 或 IS NOT NULL
+⑦ 安全等于 &lt;=&gt;
+-- 能判断 NULL（= 做不到）
+SELECT last_name, commission_pct FROM employees
+
+WHERE commission_pct &lt;=&gt; NULL;
+-- 也能判断普通值
+SELECT last_name, salary FROM employees
+WHERE salary &lt;=&gt; 12000;
+运算符
+能否判断 NULL
+可读性
+=
+不能
+好
+&lt;=&gt;
+能
+差
+提示  实际工作中判断 NULL 还是用 IS NULL，可读性更好。&lt;=&gt; 知道有这个功能就行。
+
+四、排序查询
+语法
+SELECT 查询列表
+FROM 表名
+WHERE 筛选条件
+ORDER BY 排序字段 [ASC|DESC];
+▪  ASC 升序（默认，可省略），DESC 降序
+四种排序场景
+-- ① 基本排序
+SELECT * FROM employees ORDER BY salary ASC;
+SELECT * FROM employees ORDER BY salary DESC;
+
+-- ② 排序 + 筛选（WHERE 写在 ORDER BY 前面）
+SELECT * FROM employees
+WHERE department_id >= 90
+ORDER BY hiredate ASC;
+-- ③ 按表达式排序
+SELECT *, salary * 12 * (1 + IFNULL(commission_pct, 0)) AS 年薪
+
+FROM employees
+ORDER BY salary * 12 * (1 + IFNULL(commission_pct, 0)) DESC;
+-- ④ 按别名排序（更简洁）
+SELECT *, salary * 12 * (1 + IFNULL(commission_pct, 0)) AS 年薪
+
+FROM employees
+ORDER BY 年薪 DESC;
+-- ⑤ 按函数排序
+SELECT LENGTH(last_name) AS 字节长度, last_name, salary
+FROM employees
+ORDER BY 字节长度 DESC;
+-- ⑥ 多字段排序（先按工资升序，工资相同再按编号降序）
+
+SELECT * FROM employees
+ORDER BY salary ASC, employee_id DESC;
+▪  易错：WHERE 必须写在 ORDER BY 之前，顺序颠倒会报错
+▪  易错：ORDER BY 后面可以用别名（MySQL 特性），但 WHERE 里不能用别名
+
+五、常见函数
+字符函数
+函数
+作用
+例子
+LENGTH(s)
+字节个数
+LENGTH('join') → 4
+CONCAT(s1,s2...)
+拼接
+CONCAT(last_name,'_',first_name)
+UPPER(s)
+转大写
+UPPER('join') → JOIN
+LOWER(s)
+转小写
+LOWER('JOIN') → join
+
+SUBSTR(s,pos,len)
+截取子串
+SUBSTR('abcde',1,3) → abc
+INSTR(s,sub)
+子串首次出现位置
+INSTR('abcde','cd') → 3
+TRIM(s)
+去前后空格
+TRIM('  abc  ') → abc
+LPAD(s,len,pad)
+左填充
+LPAD('abc',5,'*') → abc
+
+RPAD(s,len,pad)
+右填充
+RPAD('abc',5,'*') → abc
+-- SUBSTR 两种用法
+SELECT SUBSTR('罗志祥多人运动', 5);      -- 从第 5 个开始到结尾
+SELECT SUBSTR('罗志祥多人运动', 1, 3);   -- 从第 1 个开始取 3 个
+
+-- TRIM 的高级用法：去掉指定的字符
+SELECT TRIM('a' FROM 'aaaa罗志祥aaaaa');   -- 去掉两端的 a
+▪  易错：LENGTH 返回的是字节数不是字符数。中文在 utf8 下占 3 字节
+SELECT LENGTH('罗志祥');     -- 9（3 个中文字 × 3 字节）
+
+SELECT CHAR_LENGTH('罗志祥'); -- 3（字符数）
+▪  易错：SUBSTR 的起始下标从 1 开始，不是 0
+数学函数
+函数
+作用
+例子
+结果
+ROUND(x,d)
+四舍五入
+ROUND(-1.33)
+-1
+CEIL(x)
+向上取整
+CEIL(1.22)
+2
+FLOOR(x)
+向下取整
+FLOOR(9.99)
+
+9
+TRUNCATE(x,d)
+截断（不四舍五入）
+TRUNCATE(1.69,1)
+1.6
+MOD(a,b)
+取余
+MOD(10,3)
+1
+▪  易错：TRUNCATE 是直接截断，1.69 保留 1 位是 1.6，不是 1.7
+▪  注意：TRUNCATE 还能用来删表数据（TRUNCATE TABLE），同一个词两个用途，按上下文区分
+
+日期函数
+函数
+作用
+例子
+NOW()
+当前日期 + 时间
+2026-09-22 19:30:00
+CURDATE()
+当前日期
+2026-09-22
+CURTIME()
+当前时间
+19:30:00
+YEAR(d)
+取年份
+YEAR(NOW()) → 2026
+MONTH(d)
+取月份
+MONTH(NOW()) → 9
+STR_TO_DATE(s,fmt)
+
+字符转日期
+STR_TO_DATE('1998-2-1','%Y-%c-%d')
+DATE_FORMAT(d,fmt)
+日期转字符
+DATE_FORMAT(NOW(),'%y年%m月%d日')
+常用格式符
+格式符
+含义
+%Y
+四位年份
+%y
+两位年份
+%m
+月份（01-12）
+%c
+月份（1-12，不补零）
+%d
+日
+%H
+小时（24 小时制）
+
+%i
+分钟
+%s
+秒
+-- 案例：查询有奖金的员工名和入职日期
+SELECT last_name, DATE_FORMAT(hiredate, '%y年%m月%d日') AS 入职日期
+FROM employees
+WHERE commission_pct IS NOT NULL;
+流程控制函数
+① IF 函数（相当于三元运算符）
+
+SELECT IF(10 > 5, '大', '小');    -- 结果：大
+SELECT last_name, commission_pct,
+IF(commission_pct IS NULL, '无奖金', '有奖金') AS 奖金情况
+FROM employees;
+② CASE 函数（两种用法）
+
+-- 用法一：等值判断（相当于 switch）
+SELECT salary, department_id,
+CASE department_id
+WHEN 30 THEN salary * 1.1
+WHEN 40 THEN salary * 1.2
+WHEN 50 THEN salary * 1.3
+ELSE salary
+
+END AS 新工资
+FROM employees;
+-- 用法二：区间判断（相当于 if-else if）
+SELECT salary,
+CASE
+WHEN salary > 20000 THEN 'A'
+WHEN salary > 15000 THEN 'B'
+WHEN salary > 10000 THEN 'C'
+
+ELSE 'D'
+END AS 工资级别
+FROM employees;
+▪  易错：CASE 用法一里，WHEN 后面跟的是「值」（如 30），不能写条件（如 salary>20000）
+▪  易错：CASE 用法二里，WHEN 后面跟的是「条件」，不能只写值
+▪  易错：CASE 整体以 END 结尾，别忘了写
+
+六、你笔记里的语法问题（建议修正）
+1. 用了中文分号
+-- 你的原文
+SELECT 100 % 98 AS 结果；    -- 末尾是中文分号「；」
+▪  中文分号不是合法的 SQL 字符，会报 1064 错误，改成英文 ;
+2. 少了一个逗号
+-- 你的原文（报错）
+SELECT last_name, FROM employees WHERE last_name LIKE '__\_%';
+
+▪  last_name 后面多了一个逗号，去掉即可
+SELECT last_name FROM employees WHERE last_name LIKE '__\_%';
+3. SELECT 和 FROM 之间少了星号
+-- 你的原文（报错）
+SELECT * FROM employees ORDER BY salary ASC;
+
+▪  这行其实是对的。真正有问题的是下面这条：
+-- 缺少要查询的字段
+SELECT FROM employees WHERE salary > 12000;    -- 错
+SELECT * FROM employees WHERE salary > 12000;  -- 对
+4. WHERE 位置错误
+-- 你的原文（报错）
+
+SELECT last_name, DATE_FORMAT(hiredate,'%y年%m月%d日')
+FROM employees;
+WHERE commission_pct IS NOT NULL;
+▪  WHERE 属于同一条语句，不能加分号断开
+SELECT last_name, DATE_FORMAT(hiredate, '%y年%m月%d日')
+
+FROM employees
+WHERE commission_pct IS NOT NULL;
+5. 结尾加分号的习惯
+▪  每一条 SQL 语句都以英文分号结尾
+▪  就算是单条语句，也建议加上，避免多条语句连在一起时出错
+
+七、面试高频问题
+问题
+要点
+MySQL 里怎么拼接字符串？
+用 CONCAT，不是 + 号（+ 只做运算）
+= 和 &lt;=&gt; 的区别？
+= 不能判断 NULL，&lt;=&gt; 可以
+NULL 能用 = 判断吗？
+不能，必须用 IS NULL
+DISTINCT 怎么用？
+放在所有字段最前面，作用于后面的所有字段
+
+WHERE 和 HAVING 的区别？
+WHERE 在分组前过滤行，HAVING 在分组后过滤分组
+WHERE 和 ORDER BY 的顺序？
+WHERE 在前，ORDER BY 在后，不能颠倒
+LENGTH 和 CHAR_LENGTH 的区别？
+LENGTH 是字节数，CHAR_LENGTH 是字符数
+CASE 的两种用法区别？
+
+一种 WHEN 后跟值，一种 WHEN 后跟条件
+ORDER BY 可以用别名吗？
+可以（MySQL 特性），但 WHERE 里不能用别名
+
+八、命令速查
+-- 选择数据库
+USE myemployees;
+-- 查看当前数据库
+SELECT DATABASE();
+-- 查看所有表
+SHOW TABLES;
+-- 查看表结构
+DESC employees;
+-- 查看建表语句
+SHOW CREATE TABLE employees;
+
+========== MySQL 必学清单 ==========
+MySQL 必学清单
+看到这些就够了 ｜ 建议学习周期 3-4 天
+提示  用法：看课程时对着这份清单。清单里有的必须学会，清单外的先跳过。
+第一部分 基础操作（第 1 天）
+1. 数据库操作
+CREATE DATABASE practice;      -- 创建数据库
+
+USE practice;                  -- 使用数据库（切换）
+SHOW DATABASES;                -- 查看所有数据库
+DROP DATABASE practice;        -- 删除数据库
+2. 表操作
+-- 创建表
+CREATE TABLE users (
+
+id INT PRIMARY KEY AUTO_INCREMENT,   -- 主键、自动递增
+name VARCHAR(20) NOT NULL,           -- 字符串，不能为空
+age INT,                             -- 整数
+city VARCHAR(20),
+
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- 默认当前时间
+);
+SHOW TABLES;                   -- 查看所有表
+DESC users;                    -- 查看表结构
+DROP TABLE users;              -- 删除表
+
+需要认识的字段类型
+类型
+用途
+例子
+INT
+整数
+年龄、数量
+VARCHAR(n)
+变长字符串（最多 n 字符）
+姓名、城市
+TEXT
+长文本
+文章内容
+DECIMAL(m,n)
+精确小数
+金额
+DATETIME
+日期时间
+创建时间
+常用约束
+约束
+作用
+PRIMARY KEY
+主键，唯一且不能为空
+AUTO_INCREMENT
+自动递增，不用手动填
+
+NOT NULL
+不能为空
+DEFAULT 值
+默认值
+UNIQUE
+值不能重复
+第二部分 增删改查（第 1-2 天，重点）
+3. 增（INSERT）
+-- 插入一条
+INSERT INTO users (name, age, city) VALUES ('张三', 20, '昆明');
+-- 插入多条
+INSERT INTO users (name, age, city) VALUES
+
+('李四', 22, '成都'),
+('王五', 25, '深圳');
+4. 查（SELECT）—— 最重要，占日常工作 80%
+-- 查全部
+SELECT * FROM users;
+-- 查指定列
+SELECT name, age FROM users;
+-- 条件查询
+SELECT * FROM users WHERE age > 20;
+
+SELECT * FROM users WHERE city = '昆明';
+SELECT * FROM users WHERE age > 20 AND city = '昆明';
+SELECT * FROM users WHERE age > 20 OR city = '昆明';
+-- 模糊查询
+SELECT * FROM users WHERE name LIKE '张%';    -- 以"张"开头
+
+SELECT * FROM users WHERE name LIKE '%三';    -- 以"三"结尾
+SELECT * FROM users WHERE name LIKE '%小%';   -- 包含"小"
+-- 范围查询
+SELECT * FROM users WHERE age BETWEEN 20 AND 25;
+
+SELECT * FROM users WHERE city IN ('昆明', '成都');
+-- 空值判断
+SELECT * FROM users WHERE city IS NULL;
+SELECT * FROM users WHERE city IS NOT NULL;
+-- 排序
+SELECT * FROM users ORDER BY age ASC;         -- 升序（默认）
+
+SELECT * FROM users ORDER BY age DESC;        -- 降序
+SELECT * FROM users ORDER BY age DESC, name ASC;  -- 多字段排序
+-- 分页
+SELECT * FROM users LIMIT 5;                  -- 前 5 条
+
+SELECT * FROM users LIMIT 10, 5;              -- 跳过 10 条，取 5 条
+-- 去重
+SELECT DISTINCT city FROM users;
+-- 别名
+SELECT name AS 姓名, age AS 年龄 FROM users;
+5. 改（UPDATE）
+
+UPDATE users SET age = 21 WHERE name = '张三';
+UPDATE users SET age = 21, city = '北京' WHERE id = 1;
+提示  必须记住的规矩：先 SELECT 确认范围，再 UPDATE。忘写 WHERE 会改全表。
+-- 第 1 步：先看要改哪些
+
+SELECT * FROM users WHERE age > 22;
+-- 第 2 步：确认后改成 UPDATE
+UPDATE users SET city = '北京' WHERE age > 22;
+6. 删（DELETE）
+DELETE FROM users WHERE name = '张三';
+DELETE FROM users WHERE age < 18;
+
+TRUNCATE TABLE users;          -- 清空整表（保留表结构，id 重新从 1 开始）
+第三部分 统计与分组（第 2 天）
+7. 聚合函数
+SELECT COUNT(*) FROM users;              -- 总行数
+SELECT COUNT(city) FROM users;           -- 该列非空的行数
+
+SELECT SUM(age) FROM users;              -- 求和
+SELECT AVG(age) FROM users;              -- 平均值
+SELECT MAX(age) FROM users;              -- 最大值
+SELECT MIN(age) FROM users;              -- 最小值
+
+8. 分组（GROUP BY）
+-- 统计每个城市有多少人
+SELECT city, COUNT(*) AS 人数
+FROM users
+GROUP BY city;
+-- 统计每个城市的平均年龄
+SELECT city, AVG(age) AS 平均年龄
+FROM users
+GROUP BY city;
+-- 分组后再筛选（用 HAVING，不是 WHERE）
+
+SELECT city, COUNT(*) AS 人数
+FROM users
+GROUP BY city
+HAVING COUNT(*) > 1;
+WHERE 和 HAVING 的区别（重要）
+关键字
+作用
+时机
+WHERE
+过滤行
+分组之前
+HAVING
+过滤分组结果
+分组之后
+提示  记忆方法：WHERE 里不能写聚合函数（COUNT、SUM），要写就放 HAVING。
+
+第四部分 多表关联（第 2-3 天）
+9. 建关联表
+CREATE TABLE orders (
+id INT PRIMARY KEY AUTO_INCREMENT,
+user_id INT,
+product VARCHAR(50),
+amount DECIMAL(10,2)
+);
+INSERT INTO orders (user_id, product, amount) VALUES
+
+(1, '键盘', 299.00),
+(1, '鼠标', 99.00),
+(2, '显示器', 1299.00);
+10. JOIN 关联查询
+-- INNER JOIN：只查两边都匹配的（最常用）
+SELECT u.name, o.product, o.amount
+FROM orders o
+INNER JOIN users u ON o.user_id = u.id;
+
+-- LEFT JOIN：左表全部保留，右表没有的显示 NULL
+SELECT u.name, o.product
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id;
+三种 JOIN 的区别
+类型
+结果
+INNER JOIN
+两边都有的数据
+LEFT JOIN
+左表全部 + 右表匹配的（右表没匹配的显示 NULL）
+
+RIGHT JOIN
+右表全部 + 左表匹配的
+11. 关联 + 分组（实际工作最常见）
+-- 统计每个用户消费总额
+SELECT u.name, SUM(o.amount) AS 消费总额
+FROM users u
+INNER JOIN orders o ON u.id = o.user_id
+GROUP BY u.name;
+
+第五部分 Python 操作 MySQL（第 3-4 天，后端核心）
+12. 装库
+pip install pymysql
+13. 完整示例
+import pymysql
+# 1. 连接数据库
+conn = pymysql.connect(
+host='localhost',
+user='root',
+password='你的密码',
+
+database='practice',
+charset='utf8mb4'
+)
+# 2. 创建游标
+cursor = conn.cursor()
+# 3. 执行查询
+cursor.execute("SELECT id, name, age FROM users WHERE age > %s", (20,))
+results = cursor.fetchall()
+
+# 4. 处理结果
+for row in results:
+print(f"ID: {row[0]}, 姓名: {row[1]}, 年龄: {row[2]}")
+# 5. 关闭
+cursor.close()
+conn.close()
+14. 增删改要提交事务
+conn = pymysql.connect(...)
+
+cursor = conn.cursor()
+# 插入
+cursor.execute("INSERT INTO users (name, age, city) VALUES (%s, %s, %s)",
+('赵六', 28, '重庆'))
+conn.commit()          # 必须写！不写不会真正存进数据库
+
+# 获取刚插入的 id
+print(cursor.lastrowid)
+cursor.close()
+conn.close()
+15. 防范 SQL 注入（重要）
+# 错误写法：直接把变量拼进 SQL
+sql = f"SELECT * FROM users WHERE name = '{name}'"
+cursor.execute(sql)
+
+# 正确写法：用占位符 %s，参数单独传
+cursor.execute("SELECT * FROM users WHERE name = %s", (name,))
+提示  记住：永远用 %s 占位符，不要自己拼字符串。这是后端开发的基本安全要求。
+附 SQL 执行顺序（理解它就不会写错）
+写的时候的顺序
+
+SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+实际执行的顺序
+步骤
+做什么
+1. FROM
+先确定表
+2. WHERE
+过滤行
+3. GROUP BY
+分组
+4. HAVING
+过滤分组
+5. SELECT
+选出要显示的列
+6. ORDER BY
+排序
+7. LIMIT
+
+限制条数
+提示  这就是为什么 WHERE 里不能用聚合函数 —— 因为 WHERE 执行的时候还没分组。
+学习检查清单
+第 1 天
+▪  会建数据库、建表
+▪  认识常用字段类型和约束
+▪  会 INSERT 插入数据
+▪  会 SELECT 基本查询（WHERE、ORDER BY、LIMIT）
+▪  会 UPDATE 修改数据
+
+▪  会 DELETE 删除数据
+第 2 天
+▪  会用聚合函数（COUNT、SUM、AVG、MAX、MIN）
+▪  会 GROUP BY 分组统计
+▪  分得清 WHERE 和 HAVING
+▪  会建两张有关联的表
+▪  会用 INNER JOIN 和 LEFT JOIN
+第 3-4 天
+▪  会用 pymysql 连接数据库
+
+▪  会用 Python 执行查询并处理结果
+▪  知道增删改要 commit
+▪  知道要用 %s 占位符防注入
+暂时不用学的（先跳过）
+内容
+什么时候学
+索引原理与优化
+工作半年后
+事务隔离级别
+面试前突击
+存储引擎对比
+面试前突击
+主从复制、读写分离
+工作 1 年后
+分库分表
+工作 2 年后
+锁机制
+面试前突击
+存储过程、触发器
+基本用不到
+提示  你现在只需要"会用"，不需要"懂原理"。上面这些先跳过，别被劝退。
+
+========== SQL 练习：day3.1.sql ==========
+#进阶8：分页查询 ★
+/*
+应用场景：当要显示的数据，一页显示不全，需要分页提交sql请求
+语法：
+select 查询列表
+from 表
+【join type join 表2
+on 连接条件
+where 筛选条件
+group by 分组字段
+
+having 分组后的筛选
+order by 排序的字段】
+limit offset,size;
+offset要显示条目的起始索引（起始索引从0开始）
+size 要显示的条目个数
+*/
+#案例1：查询前五条员工信息
+SELECT * FROM employees LIMIT 0,5;
+SELECT * FROM employees LIMIT 5;
+
+#案例2：查询11-25
+SELECT * FROM employees LIMIT 10,15;
+#案例3：有奖金的员工信息，并且工资较高的前10名显示出来
+SELECT
+*
+FROM
+employees
+WHERE
+commission_pct is NOT NULL
+ORDER BY salary desc
+LIMIT 10;
+
+#进阶9：联合查询
+/*
+union 联合 合并：将多条查询语句的结果合并成一个结果
+应用场景：
+要查询的结果来自于多个表，且多个表没有直接的连接关系，但查询的信息一致时
+特点：
+1、要求多条查询语句的查询列数是一致的！
+2、要求多条查询语句的查询的每一列的类型和顺序最好一致
+3、union关键字默认去重，如果使用union all 可以包含重复项
+
+*/
+#引入的案例：查询部门编号>90或邮箱包含a的员工信息
+SELECT
+*
+FROM
+employees
+WHERE
+email LIKE '%a%' or department_id>90;
+SELECT
+*
+FROM
+employees
+WHERE
+email LIKE '%a%'
+UNION
+SELECT
+*
+FROM
+employees
+
+WHERE
+department_id>90;
+#DML语言
+/*
+数据操作语言：
+插入：insert
+修改：update
+删除：delete
+*/
+#一、插入语句
+/*
+语法：
+insert into 表名(列名,...) values(值1,...);
+*/
+#1.插入的值的类型要与列的类型一致
+INSERT into beauty(id,name,sex,borndate,phone,photo,boyfriend_id)
+
+VALUES(13,'罗志祥','男','2005-12-26','15888888888',null,2)
+SELECT * FROM beauty
+#2.不可以为null的列必须插入值。可以为null的列如何插入值？
+#方式一：
+INSERT into beauty(id,name,sex,borndate,phone,photo,boyfriend_id)
+
+VALUES(13,'罗志祥','男','2005-12-26','15888888888',null,2)
+#方式二：
+INSERT INTO beauty(id,NAME,sex,borndate,phone,boyfriend_id)
+VALUES(14,'唐艺昕','女','1990-4-23','18988888888',2);
+
+#4.列数和值的个数必须一致
+INSERT INTO beauty(NAME,sex,id,phone)
+VALUES('关晓彤','女',17,'110');
+#5.可以省略列名，默认所有列，而且列的顺序和表中列的顺序一致
+INSERT INTO beauty
+VALUES(1);
+#方式二：
+/*
+语法：
+insert into 表名
+
+set 列名=值,列名=值,...
+*/
+INSERT into beauty
+set id=19,name='刘涛',phone='998999';
+#修改语句
+/*
+1.修改单表的记录★
+语法：
+update 表名
+set 列=新值,列=新值,...
+where 筛选条件;
+2.修改多表的记录【补充】
+sql199语法：
+
+update 表1 别名
+inner|left|right join 表2 别名
+on 连接条件
+set 列=值,...
+where 筛选条件;
+*/
+#1.修改单表的记录
+#案例1：修改beauty表中姓唐的女神的电话为13899888899
+UPDATE beauty
+set phone='138888888'
+WHERE name LIKE '%罗%'
+
+#案例 2：修改 boys 表中 id 好为 2 的名称为张飞
+UPDATE boys
+set boyName='张飞',usercp=10
+WHERE id=2;
+SELECT * FROM boys
+#2.修改多表的记录
+#案例1：修改张无忌的女朋友的手机号为1114
+UPDATE boys as bo
+INNER JOIN beauty as b
+
+on bo.`id`=b.`boyfriend_id`
+set b.`phone`='114'
+WHERE bo.`boyName`=`张无忌`
+#三、删除语句
+/*
+方式一：delete
+语法：
+1、单表的删除【★】
+delete from 表名 where 筛选条件
+2、多表的删除【补充】
+方式二：truncate
+
+语法：truncate table 表名;
+*/
+#delete 单表删除 手机尾号9
+DELETE
+FROM beauty
+WHERE
+phone like '%9'
+#多表删除
+DELETE b
+FROM beauty as b
+INNER JOIN boys as bo
+on b.`boyfriend_id`=bo.`id`
+
+WHERE bo.`boyName`=`张无忌`;
+# 方式二TRUNCATE
+truncate TABLE
+boys
+#delete pk truncate
+/*
+1.delete 可以加where 条件，truncate不能加
+2.truncate删除，效率高一丢丢
+3.假如要删除的表中有自增长列，
+如果用delete删除后，再插入数据，自增长列的值从断点开始，
+而truncate删除后，再插入数据，自增长列的值从1开始。
+*/
+
+========== SQL 练习：day3.2.sql ==========
+#DDL
+/*
+数据定义语言
+库和表的管理
+一、库的管理
+创建、修改、删除
+
+二、表的管理
+创建、修改、删除
+创建： create
+修改： alter
+删除： drop
+*/
+#1.库的管理
+#库的创建
+CREATE database if not EXISTS books;
+#2.库的修改
+#3.库的删除
+drop database if EXISTS books;
+#二、表的管理
+#1.表的创建 ★
+
+/*
+语法：
+create table 表名(
+列名 列的类型【(长度) 约束】,
+列名 列的类型【(长度) 约束】,
+列名 列的类型【(长度) 约束】,
+...
+列名 列的类型【(长度) 约束】
+)
+*/
+#创建表book
+CREATE table book(
+id int,
+bname varchar(20),
+price double,
+
+author int,
+publish datetime
+);
+desc book
+#创建atrhor表
+create table author(
+id int,
+au_name varchar(20),
+nation varchar(20)
+)
+#2.表的修改
+#①修改列名
+alter table book change column publish pubdate datetime;
+
+#②修改列的类型或约束
+ALTER TABLE book modify column pubdate timestamp
+#③添加新列
+ALTER TABLE author add COLUMN annual double
+#④删除列
+ALTER TABLE author drop column annual
+
+#⑤修改表名
+ALTER table author rename to book_author
+#表的删除
+drop table if EXISTS book_author
+show tables
+#表的复制
+#1.仅仅复制表的结构
+CREATE TABLE copy LIKE author;
+#2.复制表的结构+数据
+
+CREATE TABLE copy2
+SELECT * FROM author;
+#只复制部分数据
+CREATE TABLE copy3
+SELECT id,au_name
+FROM author
+WHERE nation='中国';
+
+========== SQL 练习：day1.sql ==========
+#1.基础查询
+/*
+SELECT 查询列表 from 表名;
+特点：
+1.查询列表可以是：字段，常量，表达值，函数
+2.查询的结果是一个虚拟的表格
+*/#查询单个字段
+USE myemployees;
+SELECT
+last_name
+FROM
+
+employees;#查询多个字段
+SELECT
+last_name,
+salary
+FROM
+employees;#查询表中所有字段
+SELECT
+*
+FROM
+employees;#查询常量值
+SELECT
+100;
+SELECT
+'john';#查询表达式
+SELECT
+100 * 98;#查询函数
+SELECT
+VERSION() #起别名
+
+/*
+1.便于理解
+2.如果查询的字段有重名的情况，可以使用别名区分
+*/#方式一as
+SELECT
+100 % 98 AS 结果； SELECT
+last_name AS 姓,
+first_name AS 名
+FROM
+employees;#方式二 空格
+SELECT
+last_name 姓,
+first_name 名
+FROM
+
+employees;#去重(distinct)
+SELECT DISTINCT
+department_id
+FROM
+employees;#+号的作用（运算符）
+SELECT
+100+1;	#查询名和姓，连接成一个字段（CONCA）
+SELECT
+CONCAT( 1, 2, 3 );
+SELECT
+CONCAT( last_name, first_name ) AS 姓名
+
+FROM
+employees;
+#条件表达式筛选
+SELECT
+*
+FROM
+employees
+WHERE
+salary > 12000 SELECT
+last_name,
+department_id
+FROM
+employees
+WHERE
+department_id != 90
+#	按逻辑表达式查询
+SELECT
+last_name,
+
+salary,
+commission_pct
+FROM
+employees
+WHERE
+salary >= 10000
+AND salary <= 20000; SELECT * FROM employees WHERE department_id < 90 OR department_id > 110 OR salary > 15000;
+
+#模糊查询
+SELECT
+*
+FROM
+employees
+WHERE
+last_name LIKE '%a%';	#通配符%任意多个字符。_一个字符
+SELECT
+last_name,
+salary
+FROM
+employees
+WHERE
+last_name LIKE '__n_l%';
+#转译字符\
+SELECT
+last_name,
+
+FROM
+employees
+WHERE
+last_name LIKE '__\_%';
+#BETWEEN AND#在...之间
+SELECT
+*
+FROM
+employees
+WHERE
+employee_id BETWEEN 100 AND 120;
+#IN 		判断某字段的值是否属于in列表中的某一项
+SELECT
+last_name,job_id
+
+FROM
+employees
+WHERE
+job_id IN('IT_PROT','AD_VP');
+#is null
+SELECT
+last_name,
+commission_pct
+FROM
+employees
+WHERE
+commission_pct IS NULL;
+#安全等于<=>
+SELECT
+last_name,
+
+commission_pct
+FROM
+employees
+WHERE
+commission_pct <=> NULL;
+#判断普通类型的值
+SELECT
+last_name,
+salary
+FROM
+employees
+WHERE
+salary <=> 12000;
+#3.排序查询
+#升序
+SELECT
+*
+FROM
+employees
+
+ORDER BY
+salary
+ASC;
+#降序
+SELECT
+*
+FROM
+employees
+ORDER BY
+salary
+desc;
+#排序加筛选
+SELECT
+*
+FROM
+employees
+WHERE
+department_id>=90
+ORDER BY hiredate ASC;
+#按表达式排序
+SELECT
+*,
+salary*12*(1+IFNULL(commission_pct,0)) as 年薪
+
+FROM
+employees
+ORDER BY salary*12*(1+IFNULL(commission_pct,0)) DESC;
+#可以直接写别名
+SELECT
+*,
+salary*12*(1+IFNULL(commission_pct,0)) as 年薪
+FROM
+employees
+ORDER BY 年薪 DESC;
+
+#按姓名长度显示（函数排序）
+SELECT
+LENGTH(last_name) as 字节长度,
+last_name,
+salary
+FROM
+employees
+ORDER BY 字节长度 desc;
+#先排工资，再排员工编号（多个字段排序）
+SELECT
+*
+FROM
+employees
+ORDER BY
+salary asc,
+
+employee_id desc;
+#4.常见函数
+#字符函数
+#（1）LENGTH()获取参数值的字节个数
+SELECT LENGTH('join')
+#（2）CONCAT()拼接字符串
+SELECT CONCAT(last_name,'_',first_name) As 姓名
+FROM
+employees;
+#(3)UPPER(),LOWER()
+
+SELECT UPPER('join')
+SELECT LOWER('jOin')
+#将姓变大小，名变小写，然后拼接
+SELECT CONCAT(UPPER(last_name),LOWER(first_name)) as 姓名
+FROM
+employees;
+#(4)SUBSTR(),SUBSTRING()
+SELECT SUBSTR('罗志祥多人运动',5) as out_put
+
+SELECT SUBSTR('罗志祥多人运动',1,3) as out_put
+#姓名首字符大写，其他小写，用_拼接
+SELECT
+CONCAT(UPPER(SUBSTR(last_name,1,1)),'_',LOWER(SUBSTR(last_name,2))) as out_put
+FROM
+employees;
+
+#（5）INSTR第一次出现的索引
+SELECT INSTR('罗志祥爱上了东北雨姐','东北雨姐') as out_put;
+#（6）TRIM()去前后空格
+SELECT TRIM('   罗志祥    ')as out_put
+SELECT TRIM('a' FROM'aaaa罗志祥aaaaa')as out_put
+
+#（7）LPAD用指定的字符实现左填充指定长度
+SELECT lpad('罗志祥',10,'*')as out_put
+#（8）rPAD用指定的字符实现左填充指定长度
+SELECT rpad('罗志祥',10,'*')as out_put
+#二.数学函数
+#round四舍五入
+SELECT ROUND(-1.33);
+
+#ceil向上取整
+SELECT CEIL(1.22)
+#floor向下取整
+SELECT FLOOR(9.99)
+#truncate 截断
+SELECT TRUNCATE(1.69,1)
+#mod 取余
+SELECT MOD(10,2)
+#三.函数
+#now 返回系统日期+时间
+SELECT NOW();
+#curdate 返回系统日期，不包含时间
+
+SELECT CURDATE();
+#curtime 返回时间，不包含日期
+SELECT CURTIME();
+#可以获取指定部分，年，月，日
+SELECT year(now()) as 年;
+SELECT month(now()) as 月;
+#str_to_date 将字符转换成日期
+SELECT STR_TO_DATE('1998-2-1','%Y-%c-%d');
+
+#查询入职日期1992-4-3的员工信息
+SELECT * FROM employees WHERE hiredate = '1992-4-3'
+#date_format 讲将日期转为字符
+SELECT date_format(now(),'%y年%m月%d日') as out_put
+#查询有奖金的员工名和入职日期
+
+SELECT
+last_name,
+DATE_FORMAT(hiredate,'%y年%m月%d日')
+FROM
+employees;
+WHERE
+commission_pct is not null;
+#五.流程控制函数
+SELECT if(10>5,'大','小')
+SELECT last_name,commission_pct,if(commission_pct is null,'无奖金','有奖金')
+
+FROM
+employees;
+#CASE函数使用一
+#case 要判断的字段或表达式
+#mysql中
+case 要判断的字段或表达式
+when 常量1 then 要显示的值1或语句1;
+when 常量2 then 要显示的值2或语句2;
+...
+else 要显示的值n或语句n;
+end
+*/
+/*案例: 查询员工的工资，要求
+
+部门号=30，显示的工资为1.1倍
+部门号=40，显示的工资为1.2倍
+部门号=50，显示的工资为1.3倍
+其他部门，显示的工资为原工资
+*/
+SELECT salary,department_id,
+case department_id
+when 30 then salary*1.1
+WHEN 40 then salary*1.2
+
+when 50 then salary*1.3
+else salary
+end as 新工资
+FROM employees;
+##CASE函数使用二
+#mysql中：
+/*
+case
+when 条件1 then 要显示的值1或语句1
+when 条件2 then 要显示的值2或语句2
+...
+else 要显示的值n或语句n
+
+end
+*/
+#案例：查询员工的工资的情况
+如果工资>20000，显示A级别
+如果工资>15000，显示B级别
+如果工资>10000，显示C级别
+否则，显示D级别
+SELECT salary,
+case
+when salary>20000 then 'A'
+when salary>15000 then 'B'
+when salary>10000 then 'C'
+else 'D'
+END as 工资级别
+FROM
+employees;
+
+========== SQL 练习：day2.1.sql ==========
+#进阶 6：连接查询
+/*
+含义：又称多表查询，当查询的字段来自于多个表时，就会用到连接查询
+笛卡尔乘积现象：表 1 有 m 行，表 2 有 n 行，结果 = m*n 行
+发生原因：没有有效的连接条件
+如何避免：添加有效的连接条件
+*/
+
+SELECT name,boyname
+FROM boys,beauty;
+#1.等值连接
+SELECT name,boyName
+FROM
+boys,
+beauty
+WHERE
+beauty.boyfriend_id=boys.id
+#查询员工名和对应的部门名
+SELECT last_name,department_name
+
+FROM employees,departments
+WHERE employees.`department_id`=departments.`department_id`
+#查询工种号，工种名，员工名
+SELECT e.last_name,e.job_id,j.job_title
+FROM employees as e,jobs as j
+
+WHERE e.`job_id`=j.`job_id`
+#加筛选
+#查询有奖金的员工名，部门名
+SELECT last_name,department_name
+FROM employees as e,departments as d
+WHERE e.`department_id`=d.`department_id` AND e.`commission_pct` is not null;
+
+#查询城市名第二个字符为o的部门名和城市名
+SELECT
+department_name,city
+FROM
+departments as d,locations as l
+WHERE
+d.`location_id`=l.`location_id`
+and city like '_o%';
+#加分组
+#查询每个城市的部门个数
+
+SELECT COUNT(*) as 个数,city
+FROM
+departments as d,locations as l
+WHERE
+d.`location_id`=l.`location_id`
+GROUP BY city;
+#查询有奖金的每个部门的部门名和部门领导编号和该部门的最低工资
+SELECT
+department_name,d.manager_id,min(salary)
+
+FROM
+departments as d,employees as e
+WHERE
+d.`department_id`=e.`department_id`
+and commission_pct is not null
+GROUP BY department_name
+#加排序
+#查询每个工种的工种名和员工个数，按员工个数降序
+
+SELECT job_title,count(*)
+FROM employees as e,jobs as j
+WHERE e.`job_id`=j.`job_id`
+GROUP BY job_title
+ORDER BY COUNT(*) DESC
+#查询员工名部门名和城市
+SELECT last_name,department_name,city
+
+FROM
+employees as e,departments as d,locations as l
+WHERE
+d.`department_id`=e.`department_id` AND d.`location_id`=l.`location_id`
+#非等值连接
+#查询员工工资和工资等级
+SELECT salary,grade_level
+
+FROM employees as e,job_grades as g
+WHERE
+salary BETWEEN g.`lowest_sal` and g.`highest_sal`
+/*SELECT * FROM job_grades;
+CREATE TABLE job_grades
+(grade_level VARCHAR(3),
+
+lowest_sal  int,
+highest_sal int);
+INSERT INTO job_grades
+VALUES ('A', 1000, 2999);
+INSERT INTO job_grades
+VALUES ('B', 3000, 5999);
+INSERT INTO job_grades
+VALUES('C', 6000, 9999);
+
+INSERT INTO job_grades
+VALUES('D', 10000, 14999);
+INSERT INTO job_grades
+VALUES('E', 15000, 24999);
+INSERT INTO job_grades
+VALUES('F', 25000, 40000);
+*/
+#3.自连接
+
+#查询员工名和上级的名称
+SELECT e.employee_id,e.last_name,m.employee_id,m.last_name
+FROM
+employees as e,employees m;
+WHERE
+m.`employee_id`=e.`employees_id`
+
+========== SQL 练习：day2.2.sql ==========
+#进阶 7：子查询
+/*
+含义：
+出现在其他语句中的 select 语句，称为子查询或内查询
+外部的查询语句，称为主查询或外查询
+分类：
+按子查询出现的位置：
+select 后面：
+仅仅支持标量子查询
+from 后面：
+支持表子查询
+where 或 having 后面：
+
+标量子查询
+列子查询
+行子查询
+exists 后面（相关子查询）
+按结果集的行列数不同：
+标量子查询（结果集只有一行一列）
+列子查询（结果集只有一列多行）
+行子查询（结果集有一行多列）
+表子查询（结果集一般为多行多列）
+*/
+# 一、where 或 having 后面
+/*
+1、标量子查询（单行子查询）
+2、列子查询（多行子查询）
+
+3、行子查询（多列多行）
+特点：
+①子查询放在小括号内
+②子查询一般放在条件的右侧
+③标量子查询，一般搭配着单行操作符使用
+< >= <= = <>
+列子查询，一般搭配着多行操作符使用
+in、any/some、all
+*/
+#1. 标量子查询
+#案例1，谁的工资比abel高
+#①查询abel工资
+SELECT salary
+
+FROM employees
+WHERE last_name='abel'
+#②查询员工信息，满足撒salary>abel
+SELECT *
+FROM employees
+WHERE salary>(
+SELECT salary
+FROM employees
+WHERE last_name='abel'
+)
+#查询工资，返回 job_id 与 141 号员工相同，salary 比 143 号员工多的员工姓名，工资，job_id。
+
+#①查询141号员工的job_id
+SELECT job_id
+FROM employees
+WHERE employee_id=141
+#②查询143号员工的salary
+SELECT salary
+FROM employees
+WHERE employee_id=143
+#③查询员工姓名，工资，job_id，要求job_id=①，salary>②
+
+SELECT last_name,job_id,salary
+FROM employees
+WHERE job_id=(
+SELECT job_id
+FROM employees
+WHERE employee_id=141
+)and salary>(
+SELECT salary
+FROM employees
+WHERE employee_id=143
+
+)
+#案例3：返回公司工资最少的员工的 last_name,job_id 和 salary
+#①查询公司的 最低工资
+SELECT min(salary)
+FROM employees
+#②查询last_name,job,和salary，要求salary=①
+SELECT last_name,job_id,salary
+
+FROM employees
+WHERE salary=(
+SELECT min(salary)
+FROM employees
+)
+#案例 4：查询最低工资大于 50 号部门最低工资的部门 id 和其最低工资
+#①查询 50 号部门的最低工资
+SELECT min(salary)
+FROM employees
+WHERE department_id=50
+
+#②查询每个部门的最低工资
+SELECT min(salary),department_id
+FROM employees
+GROUP BY department_id
+#③筛选
+SELECT min(salary),department_id
+FROM employees
+GROUP BY department_id
+
+HAVING min(salary)>(
+SELECT min(salary)
+FROM employees
+WHERE department_id=50
+)
+#2. 列子查询（多行子查询）
+# 案例 1：返回 location_id 是 1400 或 1700的部门中的所有员工姓名
+#①查询id是1400 或 1700的部门
+
+SELECT DISTINCT department_id
+FROM departments
+WHERE location_id in (1400,1700)
+#②查询员工名
+SELECT last_name
+FROM employees
+WHERE department_id IN(
+SELECT DISTINCT department_id
+
+FROM departments
+WHERE location_id in (1400,1700)
+)
+#案例2：返回其它部门中比job_id为'IT_PROG'部门任一工资低的员工的员工号、姓名、工资以及部门id
+#①查询job_id为'IT_PROG'部门任一工资
+SELECT DISTINCT salary
+
+FROM employees
+WHERE job_id='IT_PROG'
+#②查询员工号，姓名，job_id 以及salary
+SELECT last_name,employee_id,job_id,salary
+FROM employees
+WHERE salary <any(
+SELECT DISTINCT salary
+
+FROM employees
+WHERE job_id='IT_PROG'
+)and job_id<>'IT_PROG'
+#3、行子查询（结果集一行多列或多行多列）
+#案例：查询员工编号最小并且工资最高的员工信息
+#①查询最小员工编号
+SELECT min(employee_id)
+FROM employees
+#②查询最高工资
+
+SELECT max(salary)
+FROM employees
+#③查询员工信息
+SELECT *
+FROM employees
+WHERE employee_id=(
+SELECT min(employee_id)
+FROM employees
+)AND salary=(SELECT max(salary)
+FROM employees)
+
+#二、select后面
+#案例：查询每个部门的员工个数
+SELECT d.*,(
+SELECT COUNT(*)
+FROM employees as e
+WHERE e.`department_id`=d.`department_id`
+)个数
+FROM departments as d;
+#案例2：查询员工号=102的部门名
+
+SELECT (
+SELECT department_name
+FROM departments as d
+INNER JOIN employees as e
+on d.department_id=e.department_id
+WHERE e.employee_id=102
+)
+#三、from后面
+#案例：查询每个部门的平均工资的工资等级
+
+#①查询每个部门平均工资
+SELECT avg(salary),department_id
+FROM employees
+GROUP BY department_id
+#②连接①的结果集和job_grades表，筛选条件平均工资 betweenlowest_sal and highest_sal
+SELECT ag_dep.*,g.`grade_level`
+
+FROM(
+SELECT avg(salary) as ag,department_id
+FROM employees
+GROUP BY department_id
+)as ag_dep
+INNER JOIN job_grades as g
+on ag_dep.ag BETWEEN lowest_sal and highest_sal
+
+#四、exists后面（相关子查询）
+/*
+语法:
+exists(完整的查询语句)
+结果:
+1或0
+*/
+SELECT EXISTS(SELECT employee_id FROM employees)
+#案例1：查询有员工的部门名
+SELECT department_name
+FROM departments as d
+
+WHERE EXISTS(
+SELECT *
+FROM employees as e
+WHERE d.`department_id`=e.`department_id`
+)
+#IN
+SELECT department_name
+FROM departments as d
+WHERE d.`department_id` in(
+SELECT department_id
+FROM employees
+)
+
+========== SQL 练习：day2.sql ==========
+#二.分组函数(统计作用)
+/*sum avg平均值 max min count计算个数
+简单使用
+和分组函数一同查询的字段要求是group by后的字段
+*/
+SELECT sum(salary) FROM employees
+SELECT avg( salary) FROM employees
+
+SELECT max(salary) FROM employees
+SELECT min(salary) FROM employees
+SELECT sum(salary) 和,AVG(salary) 平均,max(salary),min(salary)
+FROM
+employees
+#特点：参数支持哪些类型
+
+/*
+sum avg 处理数值型
+max min count 可以处理任何类型
+都忽略null值
+*/
+#和distict搭配
+SELECT sum(DISTINCT salary)
+FROM
+employees
+#count 函数详细介绍
+SELECT count(*) FROM employees
+SELECT count(1) FROM employees
+
+#和分组函数一同查询的字段有限制
+#进阶5：分组查询
+/*
+语法：
+select 分组函数,列（要求出现在group by的后面）
+from 表
+【where 筛选条件】
+group by 分组的列表
+【order by 子句】
+注意：
+查询列表必须特殊，要求是分组函数和group by后出现的字段
+*/
+#查询每个工种的最高工资
+
+SELECT max(salary),job_id
+FROM
+employees
+GROUP BY job_id
+#查询每个位置上的部门个数
+SELECT count(*),location_id
+FROM
+departments
+GROUP BY location_id;
+#添加筛选条件
+#查询邮箱中包含a字符的，每个部门的平均工资
+
+SELECT avg(salary),department_id
+FROM employees
+WHERE email like '%a%'
+GROUP BY department_id
+#查询有奖金的每个领导手下员工的最高工资
+SELECT MAX(salary),manager_id
+FROM employees
+
+WHERE commission_pct is not NULL
+GROUP BY manager_id;
+#添加复杂的筛选条件
+#查询那个部门的员工个>2
+#1.查询每个部门的员工个数
+SELECT count(*),department_id
+FROM employees
+GROUP  BY department_id
+
+#2.根据1，查询哪个部门的员工数>2
+SELECT count(*),department_id
+FROM employees
+GROUP  BY department_id
+HAVING count(*)>2
+#查询每个工种有奖金的员工的最高工资>12000的工种编号和最高工资
+#1.查询每个工种有奖金的员工的最高工资
+
+SELECT Max(salary),job_id
+FROM employees
+WHERE commission_pct is not null
+GROUP BY job_id;
+#2.根据1继续筛选
+SELECT Max(salary),job_id
+FROM employees
+WHERE commission_pct is not null
+
+GROUP BY job_id
+HAVING max(salary)>12000;
+#查询领导编号>102的每个领导手下最低工资>5000的领导编号是哪个，以及其最低工资
+#1.查询每个领导手下员工的最低工资
+SELECT min(salary),manager_id
+FROM employees
+GROUP BY manager_id
+
+#2.加筛选条件
+SELECT min(salary),manager_id
+FROM employees
+WHERE manager_id>102
+GROUP BY manager_id
+HAVING min(salary)>5000
+#按表达式或函数分组
+#按员工姓名的长度分组，查询每一组员工个数，筛选员工个数>5的有哪些
+
+#1.查询每个长度的员工个数
+SELECT count(*),LENGTH(last_name) len_name
+FROM
+employees
+GROUP BY LENGTH(last_name)
+#2.筛选条件
+SELECT count(*),LENGTH(last_name) len_name
+FROM
+employees
+
+GROUP BY LENGTH(last_name)
+HAVING COUNT(*)>5
+#按多个字段分组
+#查询每个部门每个工种的平均工资
+SELECT AVG(salary),department_id,job_id
+FROM employees
+WHERE commission_pct is not null
+
+GROUP BY job_id,department_id
+HAVING AVG(salary)>10000
+ORDER BY avg(salary) DESC
+
+========== SQL 练习：day3.sql ==========
+#二、sql99 语法
+/*
+语法：
+select 查询列表
+from 表 1 别名 【连接类型】
+join 表 2 别名
+on 连接条件
+【where 筛选条件】
+【group by 分组】
+【having 筛选条件】
+【order by 排序列表】
+
+分类：
+内连接（★）：inner
+外连接
+左外 (★):left 【outer】
+右外 (★)：right 【outer】
+全外：full【outer】
+交叉连接：cross
+*/
+#一）内连接
+/*
+语法：
+SELECT 查询列表
+FROM 表1 别名
+inner join 表2 别名
+on 连接条件
+分类
+等值
+非等值
+自连接
+*/
+
+#1.等值连接
+#查询员工名，部门名
+SELECT last_name,department_name
+FROM employees as e
+INNER JOIN departments as d
+on e.`department_id`=d.`department_id`;
+#查询名字中包含e的员工名和工种名
+
+SELECT last_name,job_title
+FROM employees as e
+INNER JOIN jobs as j
+on e.`job_id`=j.`job_id`
+WHERE e.`last_name` like '%e%';
+#查询部门个数>3的城市名和部门个数
+SELECT city,count(*) as 部门个数
+
+FROM departments as d
+INNER JOIN locations as l
+on d.`location_id`=l.`location_id`
+GROUP BY city
+HAVING count(*)>3;
+#查询部门员工个数>3的部门名和员工个数，并按个数降序
+SELECT COUNt(*),department_name
+
+FROM employees as e
+INNER JOIN departments as d
+on e.`department_id`=d.`department_id`
+GROUP BY department_name
+HAVING COUNT(*)>3
+ORDER BY count(*)
+#查询员工名，部门名，工种名，并按部门名降序()
+
+SELECT last_name,department_name,job_title
+FROM employees as e
+INNER JOIN departments as d
+on e.`department_id`=d.`department_id`
+INNER JOIN jobs j
+on e.`job_id`=j.`job_id`
+
+ORDER BY department_name desc;
+#二)非等值连接
+#查询工资级别
+SELECT salary,grade_level
+FROM employees as e
+JOIN job_grades as g
+on e.`salary` BETWEEN g.`lowest_sal` AND g.`highest_sal`;
+
+#三）自连接
+#查询员工，上级名字
+SELECT e.last_name,m.last_name
+FROM employees as e
+JOIN employees as m
+on e.`manager_id`=m.`employee_id`
+#二.外连接
+/*
+应用查询：一个表中一另一个表没有
+特点：
+1、外连接的查询结果为主表中的所有记录
+
+如果从表中有和它匹配的，则显示匹配的值
+如果从表中没有和它匹配的，则显示 null
+外连接查询结果 = 内连接结果 + 主表中有而从表没有的记录
+2、左外连接，left join 左边的是主表
+右外连接，right join 右边的是主表
+3、左外和右外交换两个表的顺序，可以实现同样的效果
+*/
+#查询男朋友 不在男神表的女神名
+
+#左外
+SELECT b.name
+FROM beauty as b
+LEFT OUTER join boys as bo
+on b.`boyfriend_id`=bo.`id`
+WHERE bo.`id` is null;
+#查询哪个部门没有员工
+SELECT d.*,e.employee_id
+FROM departments as d
+
+LEFT OUTER join employees as e
+on d.`department_id`=e.`department_id`
+WHERE e.`employee_id` is null
+#全外
+#交叉连接
+SELECT b.*,bo.*
+FROM beauty.b,
+CROSS join boys.bo;

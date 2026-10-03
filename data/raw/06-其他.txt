@@ -1,0 +1,66 @@
+========== 其他常用功能：从零讲清楚 ==========
+
+一、视图
+视图是一张虚拟的表，它本身不存数据，只保存一条查询语句。每次查询视图时，数据库会把那条语句展开执行。
+创建视图：create view v_emp as select id, name, salary from employee where salary > 5000;
+使用视图的好处有三个：一是简化复杂查询，把一段很长的 join 语句包成一个视图，之后直接查视图；二是权限控制，只把视图权限给用户，隐藏底表的其他列；三是屏蔽表结构变化，底表改了只要视图定义还在，使用方不用改。
+
+视图的缺点是性能。因为它不存数据，每次查都要展开原语句执行。复杂视图嵌套多层时性能会很差。
+可更新视图有严格限制：只有简单的单表查询、而且包含基表的所有非空列时，才能对视图做增删改。带 group by、聚合函数、distinct、union 的视图都不能更新。
+
+二、存储过程
+存储过程是一组预先编译好、存在数据库里的 SQL 语句集合，可以通过名字调用，还能带参数和流程控制。
+创建：create procedure p_raise(IN emp_id int, IN amount decimal(10,2)) begin update employee set salary = salary + amount where id = emp_id; end;
+
+调用：call p_raise(1, 1000);
+优点是把复杂逻辑放在数据库端执行，减少网络传输；一次编译多次执行，效率比逐条发 SQL 高；还能做权限控制。
+缺点是调试困难、移植性差，因为不同数据库语法不一样；业务逻辑分散在数据库和应用两处，维护起来麻烦。
+实际项目里，存储过程用得越来越少。现代做法倾向于把业务逻辑放在应用层，数据库只负责存数据。
+
+三、触发器
+触发器是一段绑定在表上的代码，在插入、更新、删除的前后自动执行，不需要显式调用。
+四个要素：时机（before 或 after）、事件（insert、update、delete）、表、执行体。
+常见用途是自动填充时间字段、记录操作日志、做数据校验。比如在插入前自动把 create_time 设成当前时间。
+
+触发器的最大问题是隐形。它在你不知情的时候执行，出了 bug 很难排查，而且也会拖慢写入。所以实际项目里能不用就不用，用应用层代码代替更好。
+
+四、用户与权限
+创建用户：create user 'test'@'localhost' identified by '密码';
+授权：grant select, insert on 库名.表名 to 'test'@'localhost';
+撤销权限：revoke insert on 库名.表名 from 'test'@'localhost';
+
+查看权限：show grants for 'test'@'localhost';
+删除用户：drop user 'test'@'localhost';
+刷新权限：flush privileges;
+授权时可以精确到库和表。'test'@'localhost' 表示只允许本机连接，换成百分号就是允许任意主机，生产环境不要这么写。
+
+MySQL 8.0 里建用户和授权可以合成一条：grant select on 库名.星号 to 'test'@'localhost' identified by '密码'; 会顺手把用户建出来。
+
+五、备份与恢复
+mysqldump 是最常用的逻辑备份工具，它把数据导出成 SQL 语句文本。
+备份单库：mysqldump -u root -p 库名 > backup.sql
+备份所有库：mysqldump -u root -p --all-databases > all.sql
+备份时加 --single-transaction 可以在 InnoDB 上做一致性快照备份，不用锁表。
+
+恢复：mysql -u root -p 库名 < backup.sql
+逻辑备份的优点是文件是文本、可以查看、跨版本兼容；缺点是备份和恢复都慢，数据量大时非常耗时。
+物理备份是直接复制数据文件，快得多，但跨版本和跨平台能力差。常用工具是 XtraBackup。
+生产环境的备份策略通常是：每天一次全量备份加 binlog，这样可以把数据恢复到任意时间点。
+
+六、字符集与排序规则
+字符集决定数据库能用哪些字符，排序规则决定字符串怎么比较和排序。
+MySQL 8.0 的默认字符集是 utf8mb4，排序规则是 utf8mb4_0900_ai_ci。
+为什么必须用 utf8mb4 而不是 utf8？因为 MySQL 里的 utf8 实际上最多只支持 3 个字节，存不了 emoji 和一些生僻字。utf8mb4 才是真正的 UTF-8，最多 4 个字节。这是个历史遗留坑，新项目一定要用 utf8mb4。
+
+排序规则末尾的 ci 表示 case insensitive，也就是大小写不敏感，'A' 和 'a' 被认为是相等的。如果业务需要区分大小写，要用 bin 或 cs 结尾的排序规则。
+查看字符集：show variables like 'character%';
+
+七、常见问答
+问：视图和表的区别是什么？答：表真实存数据，视图不存数据只存一条查询语句。视图可以简化查询和做权限控制，但性能不如直接查表，而且更新受限。
+问：为什么生产环境不推荐用触发器？答：因为它隐形。数据变化时自动执行，出问题很难定位；而且会增加写入负担，还会让主从复制出问题，因为某些触发器在从库上也会执行。
+
+问：utf8 和 utf8mb4 有什么区别？答：MySQL 的 utf8 每字符最多 3 字节，存不了 emoji 和部分生僻字；utf8mb4 是完整的 UTF-8，最多 4 字节。新项目一律用 utf8mb4。
+问：mysqldump 备份时怎么做到不锁表？答：加 --single-transaction 参数。它利用 InnoDB 的 MVCC 特性，开启一个可重复读事务来获取一致性快照，备份期间不阻塞写操作。但这个参数只对 InnoDB 有效。
+
+问：怎么把数据恢复到某个时间点？答：用全量备份加上 binlog 重放。先恢复最近一次全量备份，然后用 mysqlbinlog 工具把备份时间点到目标时间点之间的 binlog 重放一遍。
+问：存储过程该不该用？答：看场景。优点是减少网络传输、一次编译多次执行；缺点是调试难、移植差、逻辑分散。现代项目更倾向于把业务逻辑放在应用层，数据库只负责存储。
