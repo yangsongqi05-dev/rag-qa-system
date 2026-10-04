@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>历史记录 - 数据库课程智能问答助手</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<div id="nav" class="navbar"></div>
+
+<div class="page">
+  <h1>问答历史</h1>
+  <p class="sub">
+    每一次提问和回答都会自动写进 MySQL 的 <b>qa_history</b> 表，这个页面读的就是数据库里的真实记录（最新 20 条）。
+  </p>
+
+  <div class="toolbar">
+    <span id="count" class="muted">加载中…</span>
+    <button id="reload" onclick="loadHistory()">刷新</button>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="note">
+    <b>这些数据是怎么进来的？</b><br>
+    智能问答页每答完一次，<code>pipeline.py</code> 就会调 <code>history.save_qa()</code> 往表里插一条。
+    流式回答比较特殊 —— 服务器是一段一段吐字的，所以要先把碎片攒成一个完整字符串，等全部吐完才存。
+  </div>
+</div>
+
+<script src="/web/nav.js"></script>
+<script src="/web/history.js"></script>
+</body>
+</html>
