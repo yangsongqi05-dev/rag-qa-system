@@ -2,6 +2,7 @@
 var PAGES = [
   ['/web/home.html', '首页'],
   ['/', '智能问答'],
+  ['/web/history.html', '历史记录'],
   ['/web/kb.html', '知识库'],
   ['/web/eval.html', '实验数据'],
   ['/web/about.html', '系统说明']

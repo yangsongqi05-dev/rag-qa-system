@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import json
 from src.config import INDEX_FILE, WEB_DIR, TOP_K
 from src.rag import pipeline
+from src.db import history
 app = FastAPI()
 app.mount('/web', StaticFiles(directory=WEB_DIR), name='web')
 @app.get("/")
@@ -27,7 +28,9 @@ def ask_stream(q: str, top_k: int = TOP_K, use_rerank: bool = True):
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
-
+@app.get('/history')
+def get_history(limit:int=20):
+    return {'items': history.recent(limit)}
 
 
 

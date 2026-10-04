@@ -8,6 +8,7 @@ RAW_DIR=os.path.join(DATA_DIR,'raw')
 CORPUS_FILE=os.path.join(RAW_DIR,'mysql_knowledge.txt')
 VECTOR_FILE=os.path.join(DATA_DIR,'vector.json')
 WEB_DIR = os.path.join(BASE_DIR, 'web')
+DB_URL = 'mysql+pymysql://root:123456@127.0.0.1:3306/fastapi_orm'
 
 # 密钥文件
 API_KEY_FILE=r'E:\python\api_key.txt.txt'
