@@ -330,3 +330,28 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-size: 12px;
   color: var(--main);
 }
+
+/* ============ Agent 执行过程 ============ */
+.steps { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.steps-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #FAFBFC;
+  border-left: 3px solid var(--main);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #46525F;
+  line-height: 1.7;
+}
+.step .tag {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--main);
+  background: var(--main-light);
+  padding: 2px 8px;
+  border-radius: 10px;
+}

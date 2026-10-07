@@ -63,6 +63,7 @@ function ask() {
 
   var topk = document.getElementById('topk').value;
   var useRerank = document.getElementById('rerank').checked;
+  var useAgent = document.getElementById('useAgent').checked;
 
   box.value = '';
   box.style.height = 'auto';
@@ -75,6 +76,12 @@ function ask() {
   body.innerHTML = '<span class="thinking"><i></i><i></i><i></i></span>';
 
   document.getElementById('send').disabled = true;
+
+  // ---------- 路线零：Agent 模式（勾了就整条换掉，不走向下走） ----------
+  if (useAgent) {
+    askAgent(q, answerMsg, body);
+    return;
+  }
 
   var params = '&top_k=' + topk + '&use_rerank=' + useRerank;
   var started = false;    // 第一段文字到了没有
@@ -140,3 +147,68 @@ ta.addEventListener('input', function () {
   ta.style.height = 'auto';
   ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
 });
+
+// ==================== Agent 模式 ====================
+
+// 走 Agent 接口：由模型自己决定要不要查资料
+function askAgent(q, answerMsg, body) {
+  fetch('/agent?q=' + encodeURIComponent(q))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      body.textContent = d.answer;
+      showSteps(answerMsg, d.steps);
+      document.getElementById('send').disabled = false;
+      scrollBottom();
+    })
+    .catch(function () {
+      body.textContent = '（Agent 接口连不上：确认 serve.py 已启动，并且 main.py 里加了 /agent）';
+      document.getElementById('send').disabled = false;
+    });
+}
+
+// 把 Agent 的执行过程画出来
+function showSteps(answerMsg, steps) {
+  if (!steps || steps.length === 0) return;
+
+  // 整条轨迹里没有一次工具调用，说明 Agent 直接回答了，没什么可展示的
+  var hasTool = false;
+  for (var i = 0; i < steps.length; i++) {
+    if (steps[i].type === 'tool_call') hasTool = true;
+  }
+  if (!hasTool) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'steps';
+
+  var title = document.createElement('div');
+  title.className = 'steps-title';
+  title.textContent = '▾ Agent 执行过程（' + steps.length + ' 步）';
+  wrap.appendChild(title);
+
+  for (var k = 0; k < steps.length; k++) {
+    var s = steps[k];
+    var row = document.createElement('div');
+    row.className = 'step';
+
+    var tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = s.type === 'tool_call'   ? '调用工具'
+                    : s.type === 'tool_result' ? '工具返回'
+                    : '生成回答';
+    row.appendChild(tag);
+
+    var txt = document.createElement('span');
+    if (s.type === 'tool_call') {
+      txt.textContent = s.name + '（' + JSON.stringify(s.args) + '）';
+    } else if (s.type === 'tool_result') {
+      txt.textContent = s.text + ' …';
+    } else {
+      txt.textContent = '基于上面查到的资料作答';
+    }
+    row.appendChild(txt);
+
+    wrap.appendChild(row);
+  }
+
+  answerMsg.querySelector('.bubble').appendChild(wrap);
+}
