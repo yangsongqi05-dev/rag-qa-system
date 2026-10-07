@@ -2,9 +2,12 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse,StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
+
+
 from src.config import INDEX_FILE, WEB_DIR, TOP_K
 from src.rag import pipeline
 from src.db import history
+from src.agent import graph as agent_graph
 app = FastAPI()
 app.mount('/web', StaticFiles(directory=WEB_DIR), name='web')
 @app.get("/")
@@ -32,7 +35,10 @@ def ask_stream(q: str, top_k: int = TOP_K, use_rerank: bool = True):
 def get_history(limit:int=20):
     return {'items': history.recent(limit)}
 
-
+@app.get('/agent')
+def get_agent(q:str):
+    answer,messages=agent_graph.ask(q)
+    return {'answer': answer, 'steps':agent_graph.to_steps(messages)}
 
 
 

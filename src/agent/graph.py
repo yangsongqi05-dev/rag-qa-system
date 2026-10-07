@@ -27,8 +27,28 @@ def ask(question):
     )
     message=result['messages']
     return message[-1].content,message
-
-
+def to_steps(messages):
+    steps=[]
+    for m in messages:
+        name =type(m).__name__
+        if name == 'HumanMessage':
+            continue
+        if name =='AIMessage':
+            calls = getattr(m,'tool_calls',None)
+            if calls:
+                for tc in calls:
+                    steps.append(
+                        {
+                            'type':'tool_call',
+                            'name':tc['name'],
+                            'args':tc['args'],
+                        }
+                    )
+            elif m.content:
+                steps.append({'type':'answer','text': str(m.content)[:200]})
+        elif name =='ToolMessage':
+            steps.append({'type':'tool_result','text': str(m.content)[:200]})
+    return steps
 
 
 
