@@ -26,8 +26,8 @@ function renderItem(item) {
 
   // 回答
   var a = document.createElement('div');
-  a.className = 'pre answer';
-  a.textContent = item.answer || '（没有存到回答）';
+  a.className = 'answer md';
+  a.innerHTML = mdToHtml(item.answer || '（没有存到回答）');
   card.appendChild(a);
 
   // 依据的资料，默认收起来，点一下展开

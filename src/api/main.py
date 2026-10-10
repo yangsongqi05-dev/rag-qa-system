@@ -35,15 +35,18 @@ def ask_stream(q: str, top_k: int = TOP_K, use_rerank: bool = True):
 def get_history(limit:int=20):
     return {'items': history.recent(limit)}
 
+
 @app.get('/agent')
-def get_agent(q:str):
-    answer,messages=agent_graph.ask(q)
+def get_agent(q:str,thread:str='default'):
+    answer,messages = agent_graph.ask(q,thread)
     return {'answer': answer, 'steps':agent_graph.to_steps(messages)}
 
-
-
-
-
+@app.get('/agent_stream')
+def get_agent_stream(q:str,thread:str='default'):
+    async def events():
+        async for item in agent_graph.ask_stream(q,thread):
+            yield 'data: ' + json.dumps(item,ensure_ascii=False)+'\n\n'
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 

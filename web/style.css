@@ -356,3 +356,23 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
   padding: 2px 8px;
   border-radius: 10px;
 }
+
+/* ============ Markdown 渲染后的正文 ============ */
+/* md.js 把答案切成 <p> <h4> <ul> 这些块，所以这里不用再靠换行符排版 */
+.msg .body.md { white-space: normal; }
+.md p { margin: 0 0 10px; }
+.md p:last-child { margin-bottom: 0; }
+.md h4 { font-size: 15px; color: var(--main); margin: 16px 0 8px; }
+.md h4:first-child { margin-top: 0; }
+.md ul { margin: 0 0 10px; padding-left: 22px; }
+.md li { margin-bottom: 5px; line-height: 1.8; }
+.md li.sub { margin-left: 16px; list-style: circle; }
+.md b { color: #12232E; }
+.md code {
+  background: #EEF2F6;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  color: var(--main);
+}

@@ -2,6 +2,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from src.config import CHAT_MODEL, get_header
 from src.agent.tools import search_knowledge
+from langgraph.checkpoint.memory import InMemorySaver
 BASE_URL = 'https://api.siliconflow.cn/v1'
 SYSTEM_PROMPT=(
     '你是数据库课程助手。回答前先调用search_knowledge查资料'
@@ -19,17 +20,58 @@ agent=create_agent(
     model=build_model(),
     tools=[search_knowledge],
     system_prompt=SYSTEM_PROMPT,
+    checkpointer=InMemorySaver(),
 
 )
-def ask(question):
+def ask(question,thread_id='default'):
     result=agent.invoke(
-        {'messages':[{'role':'user','content':question}]}
+        {'messages':[{'role':'user','content':question}]},
+        {'configurable':{'thread_id':thread_id}}
     )
     message=result['messages']
     return message[-1].content,message
+
+
+async def ask_stream(qustion,thread_id='default'):
+    async for chunk,meta in agent.astream(
+            {'messages':[{'role':'user','content':qustion}]},
+        {'configurable':{'thread_id':thread_id}},
+        stream_mode='messages'
+    ):
+        node=meta.get('langgraph_node')
+        if node=='tools':
+            yield {'type':'tool_result','text':str(chunk.content)}
+            continue
+        cc=getattr(chunk,'tool_call_chunks',None)
+        if cc:
+            for c in cc:
+                if c.get('name'):
+                    yield {'type':'tool_call','name':c['name']}
+        elif chunk.content:
+            yield {'type':'text','text':chunk.content}
+
+    yield {'type':'done'}
+
+
+
+
+
+
+
+
+
+
+
+
 def to_steps(messages):
+    start = 0
+    for i in range(len(messages)-1,-1,-1):
+        if type(messages[i]).__name__=='HumanMessage':
+            start=i
+            break
+
     steps=[]
-    for m in messages:
+    for m in messages[start:]:
         name =type(m).__name__
         if name == 'HumanMessage':
             continue
