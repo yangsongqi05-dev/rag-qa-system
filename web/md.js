@@ -26,9 +26,23 @@ function mdToHtml(text) {
   var lines = escapeHtml(text).split('\n');
   var html = '';
   var inList = false;   // 记录现在是不是「正在一个列表里面」
+  var inCode = false;   // 记录现在是不是「正在一个代码块里面」
 
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
+
+    // 围栏代码块：单独一行 ``` 是开关，中间的内容原样保留（不解析 Markdown）
+    // 为什么放最前面：代码里什么字符都可能有，不能按普通行去解析
+    if (line.indexOf('```') === 0) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += inCode ? '</pre>' : '<pre>';
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) {
+      html += line + '\n';   // 代码块里换行是有意义的，要原样留着
+      continue;
+    }
 
     // 列表项：- xxx  或者  1. xxx（前面有空格说明是子项）
     var lm = line.match(/^(\s*)(?:[-*]|\d+\.)\s+(.*)$/);
@@ -52,6 +66,7 @@ function mdToHtml(text) {
   }
 
   if (inList) html += '</ul>';   // 最后一行还是列表项的话，收个尾
+  if (inCode) html += '</pre>';  // 万一模型忘了写收尾的 ```，也要把标签补上
 
   return html;
 }

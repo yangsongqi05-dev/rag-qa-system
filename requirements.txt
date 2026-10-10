@@ -3,3 +3,10 @@ uvicorn>=0.27
 requests>=2.31
 sqlalchemy>=2.0
 pymysql>=1.1
+
+# Agent 层（下面这组版本是实测可用的组合，别随手升级：
+# 升到 langgraph-prebuilt 1.0.10 会报
+# ImportError: cannot import name 'ExecutionInfo' from 'langgraph.runtime'）
+langchain==1.2.12
+langgraph==1.1.2
+langchain-openai==1.1.11

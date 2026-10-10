@@ -376,3 +376,16 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-size: 13px;
   color: var(--main);
 }
+.md pre {
+  background: #F5F7FA;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0 0 10px;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #2C3A47;
+}
