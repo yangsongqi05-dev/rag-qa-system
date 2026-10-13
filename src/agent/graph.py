@@ -1,12 +1,16 @@
-from langchain.agents import create_agent
+
+
+from src.agent.multi import build_multi_agent
 from langchain_openai import ChatOpenAI
 from src.config import CHAT_MODEL, get_header
-from src.agent.tools import search_knowledge
+from src.agent.tools import search_knowledge,query_database
 from langgraph.checkpoint.memory import InMemorySaver
 BASE_URL = 'https://api.siliconflow.cn/v1'
 SYSTEM_PROMPT=(
     '你是数据库课程助手。回答前先调用search_knowledge查资料'
     '只根据查到的资料作答，资料里没有的，就直说没有，不要编造'
+    '如果用户问的是数据库里的具体数据（表里有多少条记录、有哪些数据），'
+    '就调用 query_database 查询，只允许写 SELECT。'
 )
 def build_model():
     key=get_header()['Authorization'].replace('Bearer ','')
@@ -16,11 +20,8 @@ def build_model():
         api_key=key,
         temperature=0
                       )
-agent=create_agent(
-    model=build_model(),
-    tools=[search_knowledge],
-    system_prompt=SYSTEM_PROMPT,
-    checkpointer=InMemorySaver(),
+agent=build_multi_agent(
+
 
 )
 def ask(question,thread_id='default'):
@@ -42,6 +43,9 @@ async def ask_stream(qustion,thread_id='default'):
         if node=='tools':
             yield {'type':'tool_result','text':str(chunk.content)}
             continue
+        if node =='router':
+            continue
+
         cc=getattr(chunk,'tool_call_chunks',None)
         if cc:
             for c in cc:
@@ -51,15 +55,6 @@ async def ask_stream(qustion,thread_id='default'):
             yield {'type':'text','text':chunk.content}
 
     yield {'type':'done'}
-
-
-
-
-
-
-
-
-
 
 
 
