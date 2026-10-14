@@ -3,17 +3,23 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import InMemorySaver
+import os
+import sqlite3
+from langgraph.checkpoint.sqlite import SqliteSaver
 
-
-from src.config import CHAT_MODEL, get_header
+from src.config import CHAT_MODEL, get_header,DATA_DIR
 from src.agent.tools import search_knowledge, query_database
-
+from langchain_core.messages import ToolMessage
+from langgraph.types import interrupt
 BASE_URL = 'https://api.siliconflow.cn/v1'
 
 def build_model():
     key = get_header()['Authorization'].replace('Bearer ','')
     return ChatOpenAI(model=CHAT_MODEL, api_key=key,base_url=BASE_URL,temperature=0)
-
+DB_FILE = os.path.join(DATA_DIR,'checkpoints.db')
+def build_checkpointer():
+    conn = sqlite3.connect(DB_FILE,check_same_thread=False)
+    return SqliteSaver(conn)
 KB_PROMPT = (
     '你是数据库课程的知识库助手，只回答数据库概念和原理类问题。'
     '回答前必须调用 search_knowledge 查资料，只根据查到的资料作答，'
@@ -63,8 +69,18 @@ def build_multi_agent():
         out_msgs=[]
         for tc in state['messages'][-1].tool_calls:
             tool = tool_map.get(tc['name'])
-            if tool is not None:
-                out_msgs.append(tool.invoke(tc))
+            if tool is None:
+                continue
+            if tc['name']=='query_database':
+                ok = interrupt({'type':'confirm_sql','sql':tc['args'].get('sql','')})
+                if not ok:
+                    out_msgs.append(ToolMessage(
+                        content = '用户取消了这次查询，请不要执行这条 SQL',
+                        tool_call_id=tc['id'],
+
+                    ))
+                    continue
+            out_msgs.append(tool.invoke(tc))
         return {'messages':out_msgs}
     def should_continue(state):
         if getattr(state['messages'][-1],'tool_calls',None):
@@ -78,7 +94,7 @@ def build_multi_agent():
     b.add_edge('router','model')
     b.add_conditional_edges('model',should_continue,{'tools':'tools',END:END})
     b.add_edge('tools','model')
-    return b.compile(checkpointer=InMemorySaver())
+    return b.compile(checkpointer=build_checkpointer())
 
 
 

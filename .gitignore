@@ -20,3 +20,5 @@ api_key.txt
 # 系统
 .DS_Store
 Thumbs.db
+# 会话记忆的 SQLite 数据库（含对话内容，-wal/-shm 是运行期临时文件）
+data/checkpoints.db*

@@ -1,6 +1,9 @@
-// 本次页面的会话编号：刷新页面 = 开一段新对话
-var THREAD_ID = 'th-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-
+// 会话编号存在浏览器里，刷新页面也保持不变
+var THREAD_ID = localStorage.getItem('rag_thread_id');
+if (!THREAD_ID) {
+  THREAD_ID = 'th-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  localStorage.setItem('rag_thread_id', THREAD_ID);
+}
 // ==================== 消息列表操作 ====================
 
 // 往聊天区追加一条消息，返回这条消息的 DOM 节点
@@ -195,49 +198,98 @@ function askAgent(q, answerMsg, body) {
     scrollBottom();
   }
 
-  var es = new EventSource('/agent_stream?q=' + encodeURIComponent(q) + '&thread=' + encodeURIComponent(THREAD_ID));
+  // Agent 要执行 SQL 时，先弹个框问用户
+  function showConfirm(sql) {
+    var box = document.createElement('div');
+    box.className = 'confirm';
 
-  es.onmessage = function (e) {
-    var d = JSON.parse(e.data);
+    var title = document.createElement('div');
+    title.className = 'confirm-title';
+    title.textContent = '⚠️ 这条 SQL 要执行吗？';
+    box.appendChild(title);
 
-    if (d.type === 'tool_call') {
-      addStep('调用工具', d.name);
+    var pre = document.createElement('pre');
+    pre.className = 'confirm-sql';
+    pre.textContent = sql;
+    box.appendChild(pre);
 
-    } else if (d.type === 'tool_result') {
-      addStep('工具返回', d.text + ' …');
+    var okBtn = document.createElement('button');
+    okBtn.textContent = '确认执行';
+    okBtn.onclick = function () {
+      box.remove();
+      connect('/agent_resume?ok=1&thread=' + encodeURIComponent(THREAD_ID), null);
+    };
 
-    } else if (d.type === 'text') {
-      if (accText === '') body.innerHTML = '';   // 第一段文字来了，清掉「三个点」
-      accText += d.text;
-      body.innerHTML = mdToHtml(accText);
-      scrollBottom();
+    var noBtn = document.createElement('button');
+    noBtn.textContent = '取消';
+    noBtn.onclick = function () {
+      box.remove();
+      connect('/agent_resume?ok=0&thread=' + encodeURIComponent(THREAD_ID), null);
+    };
 
-    } else if (d.type === 'done') {
-      finished = true;
-      es.close();
-      document.getElementById('send').disabled = false;
-      scrollBottom();
-    }
-  };
+    box.appendChild(okBtn);
+    box.appendChild(noBtn);
+    bubble.appendChild(box);
+    scrollBottom();
+  }
 
-  // 连不上（比如后端还没加 /agent_stream），就退回一次性返回的 /agent
-  es.onerror = function () {
-    es.close();
-    if (finished) return;
+  // 连一个 SSE 流并处理事件 —— 提问和恢复两条路都走这里
+  function connect(url, fallbackQ) {
+    var es = new EventSource(url);
 
-    fetch('/agent?q=' + encodeURIComponent(q) + '&thread=' + encodeURIComponent(THREAD_ID))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        body.innerHTML = mdToHtml(d.answer);
-        showSteps(answerMsg, d.steps);
+    es.onmessage = function (e) {
+      var d = JSON.parse(e.data);
+
+      if (d.type === 'tool_call') {
+        addStep('调用工具', d.name);
+
+      } else if (d.type === 'tool_result') {
+        addStep('工具返回', d.text + ' …');
+
+      } else if (d.type === 'text') {
+        if (accText === '') body.innerHTML = '';   // 第一段文字来了，清掉「三个点」
+        accText += d.text;
+        body.innerHTML = mdToHtml(accText);
+        scrollBottom();
+
+      } else if (d.type === 'interrupt') {
+        showConfirm(d.sql);                        // 后端停下来等确认了
+
+      } else if (d.type === 'done') {
+        finished = true;
+        es.close();
         document.getElementById('send').disabled = false;
         scrollBottom();
-      })
-      .catch(function () {
-        body.textContent = '（Agent 接口连不上：确认 serve.py 已启动，并且 main.py 里加了 /agent）';
+      }
+    };
+
+    // 连不上（比如后端还没加 /agent_stream），就退回一次性返回的 /agent
+    // 恢复那条路不降级（fallbackQ 是 null），否则会把问题重问一遍
+    es.onerror = function () {
+      es.close();
+      if (finished) return;
+      if (!fallbackQ) {
         document.getElementById('send').disabled = false;
-      });
-  };
+        return;
+      }
+
+      fetch('/agent?q=' + encodeURIComponent(fallbackQ) + '&thread=' + encodeURIComponent(THREAD_ID))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          body.innerHTML = mdToHtml(d.answer);
+          showSteps(answerMsg, d.steps);
+          document.getElementById('send').disabled = false;
+          scrollBottom();
+        })
+        .catch(function () {
+          body.textContent = '（Agent 接口连不上：确认 serve.py 已启动，并且 main.py 里加了 /agent）';
+          document.getElementById('send').disabled = false;
+        });
+    };
+  }
+
+  // 第一次连接
+  connect('/agent_stream?q=' + encodeURIComponent(q) + '&thread=' + encodeURIComponent(THREAD_ID), q);
 }
 
 // 把 Agent 的执行过程画出来

@@ -1,5 +1,5 @@
 
-
+from langgraph.types import Command
 from src.agent.multi import build_multi_agent
 from langchain_openai import ChatOpenAI
 from src.config import CHAT_MODEL, get_header
@@ -33,9 +33,9 @@ def ask(question,thread_id='default'):
     return message[-1].content,message
 
 
-async def ask_stream(qustion,thread_id='default'):
-    async for chunk,meta in agent.astream(
-            {'messages':[{'role':'user','content':qustion}]},
+def _stream_events(payload,thread_id):
+    for chunk,meta in agent.stream(
+        payload,
         {'configurable':{'thread_id':thread_id}},
         stream_mode='messages'
     ):
@@ -54,7 +54,18 @@ async def ask_stream(qustion,thread_id='default'):
         elif chunk.content:
             yield {'type':'text','text':chunk.content}
 
+    state = agent.get_state({'configurable':{'thread_id':thread_id}})
+    for task in state.tasks:
+        for it in (getattr(task,'interrupts',None) or ()):
+            yield {'type':'interrupt','sql':it.value.get('sql','')}
     yield {'type':'done'}
+def ask_stream(question,thread_id='default'):
+    yield from _stream_events(
+        {'messages':[{'role':'user','content':question}]},
+        thread_id
+    )
+def ask_stream_resume(decision,thread_id='default'):
+    yield from _stream_events(Command(resume=decision),thread_id)
 
 
 

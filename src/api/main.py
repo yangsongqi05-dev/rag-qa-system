@@ -43,12 +43,17 @@ def get_agent(q:str,thread:str='default'):
 
 @app.get('/agent_stream')
 def get_agent_stream(q:str,thread:str='default'):
-    async def events():
-        async for item in agent_graph.ask_stream(q,thread):
+    def events():
+          for item in agent_graph.ask_stream(q,thread):
             yield 'data: ' + json.dumps(item,ensure_ascii=False)+'\n\n'
     return StreamingResponse(events(), media_type="text/event-stream")
 
-
+@app.get('/agent_resume')
+def get_agent_resume(ok:int=1,thread:str='default'):
+    def events():
+        for item in agent_graph.ask_stream_resume(bool(ok),thread):
+            yield 'data: ' + json.dumps(item,ensure_ascii=False)+'\n\n'
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 
